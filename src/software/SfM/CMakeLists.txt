@@ -11,6 +11,15 @@ TARGET_LINK_LIBRARIES(openMVG_main_SfMInit_ImageListing
   easyexif
   )
 
+ADD_EXECUTABLE(openMVG_main_SfMInit_ImageListing_MultiCam main_SfMInit_ImageListing_MultiCam.cpp)
+TARGET_LINK_LIBRARIES(openMVG_main_SfMInit_ImageListing_MultiCam
+  openMVG_system
+  openMVG_image
+  openMVG_features
+  openMVG_sfm
+  easyexif
+  )
+  
 #convert a v0.6 lists.txt file to the new sfm_data.X format
 ADD_EXECUTABLE(openMVG_main_ConvertList main_ConvertList.cpp)
 TARGET_LINK_LIBRARIES(openMVG_main_ConvertList
@@ -22,6 +31,8 @@ TARGET_LINK_LIBRARIES(openMVG_main_ConvertList
 # Installation rules
 SET_PROPERTY(TARGET openMVG_main_SfMInit_ImageListing PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_SfMInit_ImageListing DESTINATION bin/)
+SET_PROPERTY(TARGET openMVG_main_SfMInit_ImageListing_MultiCam PROPERTY FOLDER OpenMVG/software)
+INSTALL(TARGETS openMVG_main_SfMInit_ImageListing_MultiCam DESTINATION bin/)
 SET_PROPERTY(TARGET openMVG_main_ConvertList PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_ConvertList DESTINATION bin/)
 
