@@ -69,6 +69,7 @@ int main(int argc, char **argv)
   std::string sImage_Describer_Method = "SIFT";
   bool bForce = false;
   std::string sFeaturePreset = "";
+  std::string sFeatureThresh = "";
 #ifdef OPENMVG_USE_OPENMP
   int iNumThreads = 0;
 #endif
@@ -81,6 +82,7 @@ int main(int argc, char **argv)
   cmd.add( make_option('u', bUpRight, "upright") );
   cmd.add( make_option('f', bForce, "force") );
   cmd.add( make_option('p', sFeaturePreset, "describerPreset") );
+  cmd.add( make_option('t', sFeatureThresh, "describerThresh") );
 
 #ifdef OPENMVG_USE_OPENMP
   cmd.add( make_option('n', iNumThreads, "numThreads") );
@@ -107,6 +109,7 @@ int main(int argc, char **argv)
       << "   NORMAL (default),\n"
       << "   HIGH,\n"
       << "   ULTRA: !!Can take long time!!\n"
+      << "[-t|--describerThresh] set feature extractor threshold\n"
 #ifdef OPENMVG_USE_OPENMP
       << "[-n|--numThreads] number of parallel computations\n"
 #endif
@@ -123,6 +126,7 @@ int main(int argc, char **argv)
             << "--describerMethod " << sImage_Describer_Method << std::endl
             << "--upright " << bUpRight << std::endl
             << "--describerPreset " << (sFeaturePreset.empty() ? "NORMAL" : sFeaturePreset) << std::endl
+            << "--describerThresh " << sFeatureThresh << std::endl
             << "--force " << bForce << std::endl
 #ifdef OPENMVG_USE_OPENMP
             << "--numThreads " << iNumThreads << std::endl
@@ -200,8 +204,23 @@ int main(int argc, char **argv)
     else
     if (sImage_Describer_Method == "AKAZE_FLOAT")
     {
+      auto params = features::AKAZE::Params();
+      // Change settings got threshold
+      if (!sFeatureThresh.empty())
+      {
+        double fFeatureThresh = 0.0;
+        std::stringstream ss;
+        ss.str(sFeatureThresh);
+            
+        if ( (ss >> fFeatureThresh) ) 
+        { 
+          params.fThreshold = params.fThreshold * fFeatureThresh;
+        }
+      }
       image_describer = AKAZE_Image_describer::create
-        (AKAZE_Image_describer::Params(AKAZE::Params(), AKAZE_MSURF), !bUpRight);
+        (AKAZE_Image_describer::Params(params, AKAZE_MSURF), !bUpRight);
+      /*image_describer = AKAZE_Image_describer::create
+        (AKAZE_Image_describer::Params(AKAZE::Params(), AKAZE_MSURF), !bUpRight);*/
     }
     else
     if (sImage_Describer_Method == "AKAZE_MLDB")
