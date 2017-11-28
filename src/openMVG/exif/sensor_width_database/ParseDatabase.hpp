@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <fstream>
 #include <string>
+#include <locale>
 #include <vector>
 
 #include "datasheet.hpp"
@@ -58,7 +59,8 @@ bool getInfo
 (
   const std::string & sModel,
   const std::vector<Datasheet>& vec_database,
-  Datasheet& datasheetContent
+  Datasheet& datasheetContent,
+  bool bDoExtendedLookup // if no exact match on camera name, should we look for unique sub-match?
 )
 {
   bool existInDatabase = false;
@@ -69,6 +71,39 @@ bool getInfo
   {
     datasheetContent = *datasheet;
     existInDatabase = true;
+  }
+  else if (!sModel.empty() && bDoExtendedLookup)
+  {
+      // Do check for contains name
+      std::string model_name_lc(sModel);
+      std::transform(model_name_lc.begin(), model_name_lc.end(), model_name_lc.begin(), ::tolower);
+      const Datasheet* best_datasheet = NULL;
+      for (const auto& cur_datasheet : vec_database)
+      {
+          // If the current datasheet model name contains the provided model name, keep it
+          std::string datasheet_model_name_lc(cur_datasheet.model_);
+          std::transform(datasheet_model_name_lc.begin(), datasheet_model_name_lc.end(), datasheet_model_name_lc.begin(), ::tolower);
+          if (NULL != ::strstr(datasheet_model_name_lc.c_str(), model_name_lc.c_str()))
+          {
+              if (!best_datasheet || (best_datasheet->sensorSize_ == cur_datasheet.sensorSize_))
+              {
+                  best_datasheet = &cur_datasheet;
+              }
+              else
+              {
+                  // Multiple matches with different sensor sizes, fail
+                  best_datasheet = NULL;
+                  break;
+              }
+          }
+      }
+
+      // If we found a match, use it
+      if (best_datasheet)
+      {
+          datasheetContent = *best_datasheet;
+          existInDatabase = true;
+      }
   }
 
   return existInDatabase;

@@ -384,7 +384,7 @@ bool Bundle_Adjustment_Ceres::Adjust
     for (auto & gcp_landmark_it : sfm_data.control_points)
     {
       const Observations & obs = gcp_landmark_it.second.obs;
-
+	  size_t added_block_count = 0; // how many residual blocks did we add from this landmark
       for (const auto & obs_it : obs)
       {
         // Build the residual block corresponding to the track observation:
@@ -399,35 +399,40 @@ bool Bundle_Adjustment_Ceres::Adjust
             obs_it.second.x,
             options.control_point_opt.weight);
 
-        if (cost_function)
-        {
-          if (!map_intrinsics.at(view->id_intrinsic).empty())
-          {
-            problem.AddResidualBlock(cost_function,
-                                     nullptr,
-                                     &map_intrinsics.at(view->id_intrinsic)[0],
-                                     &map_poses.at(view->id_pose)[0],
-                                     gcp_landmark_it.second.X.data());
-          }
-          else
-          {
-            problem.AddResidualBlock(cost_function,
-                                     nullptr,
-                                     &map_poses.at(view->id_pose)[0],
-                                     gcp_landmark_it.second.X.data());
-          }
-        }
+		if (cost_function) {
+			auto map_intrinsic_for_view = map_intrinsics.find( view->id_intrinsic );
+			auto map_pose_for_view = map_poses.find(view->id_pose);
+			if ((map_intrinsic_for_view == map_intrinsics.end()) || map_intrinsic_for_view->second.empty()) {
+				std::cerr << "Missing map intrinsic for view intrinsic ID " << view->id_intrinsic << " for GCP id: " << gcp_landmark_it.first << std::endl;
+			}
+			else if ((map_pose_for_view == map_poses.end()) || map_pose_for_view->second.empty()) {
+				std::cerr << "Missing map pose for view pose ID " << view->id_pose << " for GCP id: " << gcp_landmark_it.first << std::endl;
+			}
+			else {
+				problem.AddResidualBlock(
+					cost_function,
+					nullptr,
+					&map_intrinsic_for_view->second[0],
+					&map_pose_for_view->second[0],
+					gcp_landmark_it.second.X.data());
+				++added_block_count;
+			}
+		}
+
       }
-      if (obs.empty())
-      {
+      if (obs.empty()) {
         std::cerr
           << "Cannot use this GCP id: " << gcp_landmark_it.first
           << ". There is not linked image observation." << std::endl;
       }
-      else
-      {
-        // Set the 3D point as FIXED (it's a valid GCP)
-        problem.SetParameterBlockConstant(gcp_landmark_it.second.X.data());
+	  else if (0 == added_block_count) {
+		  std::cerr
+			  << "No residual blocks added for GCP id: " << gcp_landmark_it.first
+			  << ". Missing cost function or control point view mappings." << std::endl;
+	  }
+      else {
+         // Set the 3D point as FIXED (it's a valid GCP)
+         problem.SetParameterBlockConstant(gcp_landmark_it.second.X.data());
       }
     }
   }

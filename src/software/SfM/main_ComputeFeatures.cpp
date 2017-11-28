@@ -149,7 +149,7 @@ int main(int argc, char **argv)
   // a. Load input scene
   //---------------------------------------
   SfM_Data sfm_data;
-  if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS|INTRINSICS))) {
+  if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS|INTRINSICS|CONTROL_POINTS))) {
     std::cerr << std::endl
       << "The input file \""<< sSfM_Data_Filename << "\" cannot be read" << std::endl;
     return EXIT_FAILURE;

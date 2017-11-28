@@ -1,3 +1,4 @@
+Camera Name;Sensor Width MM;Focal Length MM
 Acer CL-5300;5.75
 Acer CS-5531;5.75
 Acer CP-8531;7.11
@@ -679,9 +680,12 @@ Contax SL300R T;5.33
 Contax TVS Digital;7.11
 Contax N Digital;36
 DJI FC220;6.17
+DJI FC300C;6.16
+DJI FC330;6.3;20
 DJI FC300S;6.16
 DJI FC300X;6.16
 DJI FC350;6.17
+DJI FC6310;13.2
 DJI PHANTOM VISION FC200;6.17
 FC220;6.17
 FC300S;6.16
@@ -3473,3 +3477,5 @@ Yakumo Mega Image 45;7.11
 Yakumo Mega Image 34;5.33
 Yakumo Mega Image IV;7.11
 Yakumo Mega Image II;7.11
+YUNEEC CGO3;11;14
+YUNEEC CGO3+;11;14

@@ -38,7 +38,7 @@ struct Control_Point_Parameter
   Control_Point_Parameter
   (
     double weight_val = 20.0,
-    bool use_control_points = false
+    bool use_control_points = false // default to use control points if provided
   ): weight(weight_val), bUse_control_points(use_control_points)
   {}
   double weight;
