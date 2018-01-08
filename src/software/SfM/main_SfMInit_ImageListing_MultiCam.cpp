@@ -187,7 +187,7 @@ bool parseGPSfile(std::string & sGPSfile, Hash_Map<std::string,Vec3> & map_GPS_d
     stl::split(line, ';', vec_str);
     if (vec_str.size() != 4)
     {
-      std::cerr << "\n Missing ';' character in GPS text file" << std::endl;
+      std::cerr << "\n Missing ';' character in GPS text file\nline: " << line << std::endl;
       map_GPS_data.clear();
       return false;
     }
@@ -200,7 +200,7 @@ bool parseGPSfile(std::string & sGPSfile, Hash_Map<std::string,Vec3> & map_GPS_d
       std::stringstream ss;
       ss.str(vec_str[i]);
       if (! (ss >> readvalue) )  {
-        std::cerr << "\n Used an invalid \"not a number\" character in GPS text file" << std::endl;
+        std::cerr << "\n Used an invalid \"not a number\" character in GPS text file\nline: " << line << std::endl;
         map_GPS_data.clear();
         return false;
       }
