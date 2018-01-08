@@ -20,6 +20,7 @@ using namespace openMVG::sfm;
 #include "third_party/stlplus3/filesystemSimplified/file_system.hpp"
 
 #include <fstream>
+#include <iomanip>
 
 void getLandmarksPerView(
   const SfM_Data & sfm_data,
