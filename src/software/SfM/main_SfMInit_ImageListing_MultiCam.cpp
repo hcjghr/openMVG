@@ -137,15 +137,13 @@ using Regex_Camera_Parameters = std::tuple <std::string, EINTRINSIC, std::vector
 // Check that regex string has all the necessary data
 // and construct a set of valid Regex_Camera_Parameters objects
 bool checkRegexCameraParametersValidity(const std::string & sCameraRegex, std::set<Regex_Camera_Parameters> & set_camera_parameters)
-{
-  std::stringstream ss;
-  
+{ 
   // Split string to separate elements
   std::vector<std::string> vec_regex_elements;
   stl::split(sCameraRegex, ';', vec_regex_elements);
   
   // Loop through elements and check if all values are valid
-  for (size_t i = 0; i < vec_regex_elements.size(); ++i)
+  for (size_t i = 0; i < vec_regex_elements.size();)
   {
     // Check if there is enough parameters for at least one basic camera
     if ((vec_regex_elements.size()-i) < 5)
@@ -169,6 +167,7 @@ bool checkRegexCameraParametersValidity(const std::string & sCameraRegex, std::s
     if (*p == 0)
     {
       // Convert to string and EINTRINSIC
+      std::stringstream ss;
       int iCamType;
       ss.str(vec_regex_elements[i]);
       ss >> iCamType;
@@ -226,8 +225,11 @@ bool checkRegexCameraParametersValidity(const std::string & sCameraRegex, std::s
     
     // Print the summary of the regex camera unit
     std::cout << "\nCamera model: " << (int) std::get<1>(camera_params) << std::endl;
-    std::cout << "F: " << std::get<2>(camera_params).at(0)<<" PPX: "<< std::get<2>(camera_params).at(1)<<" PPY: "<< std::get<2>(camera_params).at(2)<< std::endl;
-    std::cout << "Distortion: " << std::flush;
+    std::cout << "F: " << std::get<2>(camera_params).at(0)
+              << " PPX: " << std::get<2>(camera_params).at(1)
+              << " PPY: " << std::get<2>(camera_params).at(2)<< std::endl
+              << "Distortion: " << std::flush;
+
     for ( int p_i = 3; p_i < n_param; ++p_i)
     {
       std::cout<<std::get<2>(camera_params).at(p_i) << " " << std::flush;
