@@ -255,17 +255,6 @@ TARGET_LINK_LIBRARIES(openMVG_main_openMVG2PMVS
   openMVG_sfm
   stlplus
   )
-
-# - Export a SfM openMVG scene to MICMAC format
-#
-ADD_EXECUTABLE(openMVG_main_openMVG2MICMAC main_openMVG2MICMAC.cpp)
-TARGET_LINK_LIBRARIES(openMVG_main_openMVG2MICMAC
-  openMVG_system
-  openMVG_image
-  openMVG_features
-  openMVG_sfm
-  stlplus
-  )
   
 # - Export a SfM openMVG scene to openMVS format
 #
@@ -342,13 +331,22 @@ TARGET_LINK_LIBRARIES( openMVG_main_openMVG2NVM
   openMVG_sfm
   stlplus )
 
+# - Export a SfM openMVG scene to MICMAC format
+#
+ADD_EXECUTABLE(openMVG_main_openMVG2MICMAC main_openMVG2MICMAC.cpp)
+TARGET_LINK_LIBRARIES(openMVG_main_openMVG2MICMAC
+  openMVG_system
+  openMVG_image
+  openMVG_features
+  openMVG_sfm
+  stlplus
+  )
+
 # installation rules
 SET_PROPERTY(TARGET openMVG_main_openMVG2PMVS PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_openMVG2PMVS DESTINATION bin/)
 SET_PROPERTY(TARGET openMVG_main_openMVG2openMVS PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_openMVG2openMVS DESTINATION bin/)
-SET_PROPERTY(TARGET openMVG_main_openMVG2MICMAC PROPERTY FOLDER OpenMVG/software)
-INSTALL(TARGETS openMVG_main_openMVG2MICMAC DESTINATION bin/)
 SET_PROPERTY(TARGET openMVG_main_openMVG2CMPMVS PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_openMVG2CMPMVS DESTINATION bin/)
 SET_PROPERTY(TARGET openMVG_main_openMVG2MESHLAB PROPERTY FOLDER OpenMVG/software)
@@ -361,6 +359,8 @@ SET_PROPERTY(TARGET openMVG_main_ExportCameraFrustums PROPERTY FOLDER OpenMVG/so
 INSTALL(TARGETS openMVG_main_ExportCameraFrustums DESTINATION bin/)
 SET_PROPERTY(TARGET openMVG_main_openMVG2NVM PROPERTY FOLDER OpenMVG/software)
 INSTALL(TARGETS openMVG_main_openMVG2NVM DESTINATION bin/)
+SET_PROPERTY(TARGET openMVG_main_openMVG2MICMAC PROPERTY FOLDER OpenMVG/software)
+INSTALL(TARGETS openMVG_main_openMVG2MICMAC DESTINATION bin/)
 
 # -
 # Use openCV Feature detector to describe the images
