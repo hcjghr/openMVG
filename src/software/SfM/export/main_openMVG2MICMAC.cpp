@@ -94,7 +94,7 @@ bool exportCAMSToMICMAC(
       const Pinhole_Intrinsic * pinhole_cam = static_cast<const Pinhole_Intrinsic *>(cam);
 
       // We compute the 'AltiSol' an the 'Depth' param. Suboptimal for now.
-      double meanDepth = 0., meanZ = 0.;
+      double meanDepth = 0., meanZ = 0., mean_d = 0.;
 
       // Find all landmarks it sees
       if (landmarks_per_view.find(id_view)!=landmarks_per_view.end())
@@ -106,7 +106,8 @@ bool exportCAMSToMICMAC(
           n_landmarks++;
           // Use running average to avoid possibility of overflow
           meanZ = (meanZ * (n_landmarks-1)/(n_landmarks*1.0)) + ((*it)(2)/(n_landmarks*1.0));
-          meanDepth = (meanDepth * (n_landmarks-1)/(n_landmarks*1.0)) + (pose.depth((*it))/(n_landmarks*1.0));
+	  mean_d = Depth(pose.rotation(), pose.translation(), *it);
+          meanDepth = (meanDepth * (n_landmarks-1)/(n_landmarks*1.0)) + (mean_d/(n_landmarks*1.0));
         }
       }
       valid_views.push_back(iter);
