@@ -43,6 +43,8 @@ static float y_offset = 0.f;
 static float z_offset = 0.f;
 static float normalized_focal = 1.f;
 
+static float display_image_alpha = 0.7f;
+
 // Contiguous array of the valid camera index
 static std::vector<IndexT> vec_cameras;
 
@@ -117,6 +119,18 @@ void key(GLFWwindow* window, int k, int scancode, int action, int mod)
   switch (k) {
   case GLFW_KEY_ESCAPE:
     running = 0;
+    break;
+  case GLFW_KEY_UP:
+    display_image_alpha += 0.1f;
+    if (display_image_alpha > 1.0)  {
+      display_image_alpha = 1.0f;
+    }
+    break;
+  case GLFW_KEY_DOWN:
+    display_image_alpha -= 0.1f;
+    if (display_image_alpha < 0.2)  {
+      display_image_alpha = 0.2f;
+    }
     break;
   case GLFW_KEY_LEFT:
     --current_cam;
@@ -295,9 +309,9 @@ static void draw(void)
           glDisable(GL_DEPTH_TEST);
 
           if (i_cam == current_cam) {
-            glColor4f(0.5f,0.5f,0.5f, 0.7f);
+            glColor4f(0.9f,0.9f,0.9f, display_image_alpha);
           } else {
-            glColor4f(0.5f,0.5f,0.5f, 0.5f);
+            glColor4f(0.9f,0.9f,0.9f, display_image_alpha);
           }
 
           glBegin(GL_QUADS);
@@ -377,6 +391,7 @@ int main(int argc, char *argv[]) {
     << "Move viewpoint with Q,W,E,A,S,D" << std::endl
     << "Change Normalized focal (camera cones size) with '+' and '-'" << std::endl
     << "Reset viewpoint position with R" << std::endl
+    << "Press up or down key to increase/decrease transparency of displayed image." << std::endl
     << "Esc to quit" << std::endl;
 
   //-- Create the GL window context
