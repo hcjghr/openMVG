@@ -237,12 +237,21 @@ static void draw(void)
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_LIGHTING);
 
-    //Draw Structure in GREEN (as seen from the current camera)
+    //Draw Structure in GREEN / YELLOW (features that are observed / not observed in current frame (as seen from the current camera)
+    const IndexT current_view_id = sfm_data.GetViews().at(vec_cameras[current_cam])->id_view;
     glBegin(GL_POINTS);
     glColor3f(0.f,1.f,0.f);
     for (const auto & landmark_iter : sfm_data.GetLandmarks())
     {
       const Landmark & landmark = landmark_iter.second;
+      if (landmark.obs.count(current_view_id) > 0)
+      {
+        glColor3f(0.f,1.f,0.f);
+      }
+      else
+      {
+        glColor3f(1.f,1.f,0.f);
+      }
       glVertex3d(landmark.X(0), landmark.X(1), landmark.X(2));
     }
     glEnd();
