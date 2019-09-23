@@ -22,6 +22,7 @@ namespace vsslam {
 class SLAM_System
 {
 private:
+  int verbose_level = 0;
   std::shared_ptr<VSSLAM_Parameters> params_;
   // Map of cameras
   Hash_Map<IndexT, std::shared_ptr<Camera> > map_cameras_;
@@ -41,6 +42,9 @@ public:
   SLAM_System(std::shared_ptr<VSSLAM_Parameters> & params);
 
   ~SLAM_System();
+
+  void prepareStatsFile();
+  void setVerboseLevel(int level);
   // Set up tracker
   void setTracker(std::unique_ptr<Abstract_Tracker> & tracker);
   void setFeatureExtractor(std::unique_ptr<Abstract_Feature_Extractor> & extractor);
@@ -81,8 +85,16 @@ public:
     return tracker_->getCurrentFramePtr();
   }
 
+  void printCameraParameters(IndexT & cam_id);
+
   void printStatistics(VSSLAM_Time_Stats & stats);
 
+
+  void disableOutput();
+  void setOutputDirectory(std::string s_output_folder);
+  void setIntermediateResultOutput(bool b_intermediate_output);
+
+  void exportStatisticsHeader();
   void exportStatistics(VSSLAM_Time_Stats & stats);
 };
 

@@ -33,6 +33,9 @@
  *		in the header, in order to move the slow building of SLAM++ to BAOptimizer.cpp, which
  *		is rarely changed throughout the development process.
  */
+
+extern int n_dummy_param;
+
 namespace openMVG {
 namespace vsslam {
 
@@ -44,10 +47,18 @@ public:
   using _TyObservation = CEdgeP2C_XYZ_Sim3_G;
 
   using TVertexTypelist = MakeTypelist_Safe((CVertexCamSim3, _TyLandmark));
-  using TConstVertexTypelist = MakeTypelist_Safe((CVertexCamSim3, _TyLandmark));
-  using TEdgeTypelist = MakeTypelist_Safe((_TyObservation, CEdgePoseCamSim3));
-  using CSystemType = CFlatSystem<CBaseVertex, TVertexTypelist, CBaseEdge, TEdgeTypelist, CNullUnaryFactorFactory,
-      CBaseVertex, TConstVertexTypelist>;
+  
+  //#ifdef USE_EXPLICIT_HARD_UF
+  //using TConstVertexTypelist = MakeTypelist_Safe((CVertexCamSim3, _TyLandmark));
+  //#endif
+
+  //#ifdef USE_EXPLICIT_HARD_UF
+  //using TEdgeTypelist = MakeTypelist_Safe((_TyObservation, CEdgePoseCamSim3));
+  //using CSystemType = CFlatSystem<CBaseVertex, TVertexTypelist, CBaseEdge, TEdgeTypelist, CNullUnaryFactorFactory, CBaseVertex, TConstVertexTypelist>;
+  //#else USE_EXPLICIT_HARD_UF
+  using TEdgeTypelist = MakeTypelist_Safe((_TyObservation));
+  using CSystemType = CFlatSystem<CBaseVertex, TVertexTypelist, _TyObservation, TEdgeTypelist>;
+  //#endif
 
   using CLinearSolverType = CLinearSolver_UberBlock<CSystemType::_TyHessianMatrixBlockList>;
   using CNonlinearSolverType = CNonlinearSolver_Lambda_DL<CSystemType, CLinearSolverType>;
@@ -80,6 +91,8 @@ public:
   void Set_TrustRadius_Persistence(bool b_trust_radius_persistent) override;
   void Set_UpdateThreshold(double f_update_thresh) override;
   void Set_AllBatch(bool b_all_batch) override;
+  void Set_ForceIncSchur(bool b_force_inc_schur) override;
+  void Set_RelinThreshold(double f_relin_thresh) override;
 
   // Get basic data
 	size_t n_Vertex_Num() const override;
@@ -101,6 +114,9 @@ public:
 	// Optimization
   void Optimize(size_t n_max_iteration_num = 5, double f_min_dx_norm = .01, double f_min_dl_norm = .01) override; // throw(srd::bad_alloc, std::runtime_error)
 
+  // Covariance recovery
+  Eigen::MatrixXd Get_CovarianceBlock(size_t element_1_slampp_id, size_t element_2_slampp_id) override;
+  
   // Export
 	void Show_Stats(bool b_calculate_eigenvalues = true) const override;
 	bool Dump_State(const char *p_s_filename) const override; // note that this saves the state as Sim(3)

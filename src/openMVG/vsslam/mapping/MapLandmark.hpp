@@ -40,6 +40,8 @@ class MapLandmark
 public:
   IndexT id_;
   Vec3 X_;
+  Eigen::Matrix3d cov_X_;
+  
   // 1 - initialization point; 2- motion model/reference kf; 3-map tracking point; 4- new triangulated point
   size_t association_type_ = 0; // Through which tye of association the point was added
   IndexT last_local_map_frame_id_ = UndefinedIndexT;  // Id of frame for which the point was last added to local map

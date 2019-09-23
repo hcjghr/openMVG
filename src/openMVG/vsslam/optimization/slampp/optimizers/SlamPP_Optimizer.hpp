@@ -5,7 +5,7 @@
  */
 
 #define SIM3_USE_ROBUST_EDGES
-#define USE_EXPLICIT_HARD_UF // use explicit UF via a const vertex?
+//#define USE_EXPLICIT_HARD_UF // use explicit UF via a const vertex?
 #define LANDMARK_TYPE_XYZ
 #define LANDMARKS_GLOBAL
 
@@ -38,6 +38,9 @@ public:
   virtual void Set_TrustRadius_Persistence(bool b_trust_radius_persistent) = 0;
   virtual void Set_UpdateThreshold(double f_update_thresh) = 0;
   virtual void Set_AllBatch(bool b_all_batch) = 0;
+  virtual void Set_ForceIncSchur(bool b_force_inc_schur) = 0;
+  virtual void Set_RelinThreshold(double f_relin_thresh) = 0;
+
 
   // Get basic data
   virtual size_t n_Vertex_Num() const = 0;
@@ -58,6 +61,9 @@ public:
 
   // Optimization
   virtual void Optimize(size_t n_max_iteration_num = 5, double f_min_dx_norm = .01, double f_min_dl_norm = .01) = 0; // throw(srd::bad_alloc, std::runtime_error)
+  
+  // Covariance recovery
+  virtual Eigen::MatrixXd Get_CovarianceBlock(size_t element_1_slampp_id, size_t element_2_slampp_id) =0;
 
   // Export
   virtual void Show_Stats(bool b_calculate_eigenvalues = true) const = 0;

@@ -57,8 +57,6 @@ bool PoseEstimator::computeH
     x2, size_img_2.first, size_img_2.second,
     false); // configure as point to point error model.
 
-  std::cout<<"SI1: "<<size_img_1.first<<", "<<size_img_1.second<<"\n";
-  std::cout<<"SI2: "<<size_img_2.first<<", "<<size_img_2.second<<"\n";
   // ACRansacOut.first (threshold) ACRansacOut.second(NFA score)
   // Precision is squared distance to projection
   ACRansacInfo = ACRANSAC(kernel, vec_inliers, ACRANSAC_ITER, &H_21, f_max_thresh*f_max_thresh, false);
@@ -125,7 +123,8 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
     VSSLAM_Parameters * param
 )
 {
-  std::cout<<"Pose: [Estimator] Try estimating H and E\n";
+  if(param->verbose_level>1)
+    std::cout<<"Pose: [Estimator] Try estimating H and E\n";
 
   // ----------------------------
   // Get camera info
@@ -171,7 +170,8 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
     b_valid_H = false;
   }
 
-  std::cout<<"Pose: [Compute H] " << b_valid_H << " thresh: " << infoACR_H.first<<" NFA: "<<infoACR_H.second <<" inliers: "<<vec_inliers_H.size() <<"\n";
+  if(param->verbose_level>1)
+    std::cout<<"Pose: [Compute H] " << b_valid_H << " thresh: " << infoACR_H.first<<" NFA: "<<infoACR_H.second <<" inliers: "<<vec_inliers_H.size() <<"\n";
 
 
   // ----------------------------
@@ -191,14 +191,15 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
     b_valid_E = false;
   }
 
-  std::cout<<"Pose: [Compute E] " << b_valid_E << " thresh: " << infoACR_E.first<<" NFA: "<<infoACR_E.second <<" inliers: "<<vec_inliers_E.size() <<"\n";
-
+  if(param->verbose_level>1)
+    std::cout<<"Pose: [Compute E] " << b_valid_E << " thresh: " << infoACR_E.first<<" NFA: "<<infoACR_E.second <<" inliers: "<<vec_inliers_E.size() <<"\n";
 
   // Check if either of models is ok
   if (!b_valid_H && !b_valid_E)
   {
     // Neither models were successful! - skip this frame
-    std::cout<<"Pose: Unsuccessful pose estimation! No model available\n";
+    if(param->verbose_level>1)
+      std::cout<<"Pose: Unsuccessful pose estimation! No model available\n";
     return false;
   }
 
@@ -213,12 +214,14 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
 
   if (b_use_H)
   {
-    std::cout<<"Pose: Model H selected!\n";
+    std::cout<<"Pose: Model H selected! - NOT IMPLEMENTED\n";
     return false;
   }
   else
   {
-    std::cout<<"Pose: Model E selected!\n";
+    if(param->verbose_level>1)
+      std::cout<<"Pose: Model E selected!\n";
+
     // Try to get the pose from Essential matrix
     Mat3 R_11 = Mat3::Identity(); Vec3 t_11 = Vec3::Zero(); double s_11 = 1.0;
     Mat3 R_21; Vec3 t_21; double s_21;
@@ -247,6 +250,7 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
         // If angle is smaller than threshold delete it
         if (cosParallax > param->init_track_min_cos_parallax_pt)
         {
+          //std::cout << "Inlier deleted (cos parallax): "<<cosParallax << " :: " << param->init_track_min_cos_parallax_pt << "\n";
           it_inlier = vec_inliers_E.erase(it_inlier);
         }
         else
@@ -257,7 +261,9 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
 
       if (vec_inliers_E.size() < param->init_track_min_matches)
       {
-        std::cout<<"Pose: Unsuccessful pose estimation! Issuficuent # of inliers: " << vec_inliers_E.size() << "\n";
+        if(param->verbose_level>1)
+          std::cout<<"Pose: Unsuccessful pose estimation! Issuficuent # of inliers: " << vec_inliers_E.size() << "\n";
+
         return false;
       }
 
@@ -268,11 +274,22 @@ bool PoseEstimator::estimateRobustRelativePose_HE_Pinhole
       T = Mat4::Identity();
       T.block(0,0,3,3) = 1/s_21 * R_21.transpose();
       T.block(0,3,3,1) = - (1/s_21 * R_21.transpose())*t_21;
+
+      if(param->verbose_level>1)
+      {
+        std::cout << "Relative pose init:\n"
+                  << "R:\n" << R_21 << "\n"
+                  << "t: " << t_21.transpose() << "\n"
+                  << "s: " << s_21 << "\n\n";
+      }
+
       return true;
     }
     else
     {
-      std::cout<<"Pose: Unsuccessful pose estimation! Failed extracting Rts from E\n";
+      if(param->verbose_level>1)
+        std::cout<<"Pose: Unsuccessful pose estimation! Failed extracting Rts from E\n";
+
       return false;
     }
     return true;
@@ -360,14 +377,17 @@ bool PoseEstimator::estimateRobustPose_Pinhole
 
   // Update the upper bound precision of the model found by AC-RANSAC
   f_model_thresh = ACRansacOut.first*ACRansacOut.first;
-  std::cout<<"P3P inliers: "<<vec_inliers.size()<<"\n";
+
+  if(param->verbose_level>1)
+    std::cout<<"P3P inliers: "<<vec_inliers.size()<<"\n";
 
   // Test if the mode support some points (more than those required for estimation)
   const bool bResection = (vec_inliers.size() > 2.5 * openMVG::euclidean_resection::P3PSolver::MINIMUM_SAMPLES);
 
   if (bResection)
   {
-    std::cout<<"Pose: Successful P3P estimation! # inliers: "<<vec_inliers.size()<<"\n";
+    if(param->verbose_level>1)
+      std::cout<<"Pose: Successful P3P estimation! # inliers: "<<vec_inliers.size()<<"\n";
 
     Mat3 K_t;
     Mat3 R;
@@ -381,7 +401,9 @@ bool PoseEstimator::estimateRobustPose_Pinhole
     return true;
   }
 
-  std::cout<<"Pose: Failed EPnP estimation! # inliers: "<<vec_inliers.size()<<"\n";
+  if(param->verbose_level>1)
+    std::cout<<"Pose: Failed EPnP estimation! # inliers: "<<vec_inliers.size()<<"\n";
+    
   return false;
 }
 
@@ -471,10 +493,8 @@ bool PoseEstimator::getRelativeCameraTransformation
     return true;
   }
 
-
   std::cout<<"Relative frames ARE NOT IMPLEMENTED...YET!\n";
   return false;
-
 
 }
 }

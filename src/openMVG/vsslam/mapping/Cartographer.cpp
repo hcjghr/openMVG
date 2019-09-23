@@ -60,7 +60,9 @@ namespace vsslam {
     std::map<Frame *, size_t> n_obs_per_frame;
     size_t n_landmarks_ok = 0;
 
-    std::cout<<"Checking map conditions\n";
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Initialization Map] Checking map conditions\n";
+
     for (auto & map_landmark_local : map_local_.map_landmarks_)
     {
       MapLandmark * map_landmark = map_landmark_local.second.get();
@@ -80,11 +82,13 @@ namespace vsslam {
 
     if (n_landmarks_ok < params_->map_min_init_pts)
     {
-      std::cout<<"Cartographer: [Initialization Map] Failed: Insufficient quality local landmarks: "<<n_landmarks_ok<<"\n";
+      if (verbose_level > 1)
+        std::cout<<"Cartographer: [Initialization Map] Failed: Insufficient quality local landmarks: "<<n_landmarks_ok<<"\n";
       return false;
     }
 
-    std::cout<<"Cartographer: [Initialization Map] Quality local landmarks: "<<n_landmarks_ok<<"\n";
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Initialization Map] Quality local landmarks: "<<n_landmarks_ok<<"\n";
 
     bool b_frames_ok = true;
     for (auto & frame_local : map_local_.map_frame_)
@@ -102,21 +106,31 @@ namespace vsslam {
 
     if (!b_frames_ok)
     {
-      std::cout<<"Cartographer: [Initialization Map] Failed: Frames are not well defined!\n";
+      if (verbose_level > 1)
+        std::cout<<"Cartographer: [Initialization Map] Failed: Frames are not well defined!\n";
       return false;
     }
-    printMapStats();
+
+    if (verbose_level > 1)
+    {
+      printMapStats();
+    }
 
     return true;
   }
 
+
+  double d_feat_mapping_global_step_prepare = 0.0;
+  double d_feat_mapping_global_step_BA = 0.0;
+  double d_feat_mapping_global_step_update = 0.0;
   // -------------------
   // -- Map
   // -------------------
   bool Cartographer::addStep
   (
     std::shared_ptr<Frame> & frame,
-    NewMapLandmarks * vec_new_landmarks
+    NewMapLandmarks * vec_new_landmarks,
+    VSSLAM_Time_Stats * stats
   )
   {
     bool b_step_ok = false;
@@ -125,12 +139,24 @@ namespace vsslam {
     // Increase step
     step_id_++;
 
-    std::cout<<"Cartographer: Step: " << step_id_ << " Frame id: " << frame_id << "\n";
-    printMapStats();
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Step #" << step_id_ << "] Frame id: " << frame_id << "\n";
+
+    if (stats)
+    {
+      stats->global_step_id = step_id_;
+    }
 
     if (!b_global_map_intialized_)
     {
-      std::cout<<"Cartographer: Step: " << step_id_ << ": Initialization\n";
+      if (verbose_level > 1)
+        std::cout<<"Cartographer: [Step #" << step_id_ << "] Initialization\n";
+
+      if (stats)
+      {
+        stats->startTimer(stats->d_feat_mapping_global_step_prepare);
+      }
+      
       // Add frame to local map
       addFrameToLocalMap(frame, false);
 
@@ -143,19 +169,36 @@ namespace vsslam {
         addLandmarksToStructure(frame.get(),*vec_new_landmarks,  params_->map_min_quality_landmark);
       }
 
+      // Show some stats
+      if (verbose_level > 1)
+      {
+        printMapStats();
+      }
       // Try to initialize if enough frames
       if (map_local_.getNumberOfFrames() < params_->map_min_frame_init)
       {
-        return true;
+        if (stats)
+        {
+          stats->stopTimer(stats->d_feat_mapping_global_step_prepare);
+        }
+        return false;
       }
       else
       {
         // Once we have enough frames we try to initialize map
-        std::cout<<"Cartographer: [Initialization] Try to initialize map in step " << step_id_ << "\n";
+        if (verbose_level > 1)
+          std::cout<<"Cartographer: [Initialization] Try to initialize map in step " << step_id_ << "\n";
 
         if (!checkInitializationConditions())
         {
-          std::cout<<"Cartographer: [Initialization] Map initialization failed!\n";
+          if (verbose_level > 1)
+            std::cout<<"Cartographer: [Initialization] Map initialization failed!\n";
+
+          if (stats)
+          {
+            stats->stopTimer(stats->d_feat_mapping_global_step_prepare);
+          }
+
           resetInitializationData();
           return false;
         }
@@ -179,15 +222,35 @@ namespace vsslam {
 
         if (n_map_landmarks_ok < params_->map_min_init_pts)
         {
-          std::cout<<"Cartographer: [Initialization Map] Failed: Insufficient quality local landmarks: "<<n_map_landmarks_ok<<"\n";
+          if (verbose_level > 1)
+            std::cout<<"Cartographer: [Initialization Map] Failed: Insufficient quality local landmarks: "<<n_map_landmarks_ok<<"\n";
+
+          if (stats)
+          {
+            stats->stopTimer(stats->d_feat_mapping_global_step_prepare);
+          }
+
           resetInitializationData();
           return false;
         }
 
-        // Globally optimize the system
-        if (!optimizeIncSystem())
+        if (stats)
         {
-          std::cout<<"Cartographer: [Initialization Map] Failed: Initial global optimization falied!\n";
+          stats->stopTimer(stats->d_feat_mapping_global_step_prepare);
+        }
+
+        // Globally optimize the system
+        if (verbose_level > 1)
+          std::cout<<"Cartographer: [Step #" << step_id_ << "] Global optimization\n";
+
+        // Perform global optimization
+        bool b_global_ok = BA_obj_->optimizeGlobal(map_global_, stats);
+
+        if (!b_global_ok)
+        {
+          if (verbose_level > 1)
+            std::cout<<"Cartographer: [Initialization Map] Failed: Initial global optimization falied!\n";
+
           resetInitializationData();
           return false;
 
@@ -196,21 +259,33 @@ namespace vsslam {
 
         // Clear all unnecessary data
         clearInitializationData();
-        // Show some stats
-        printMapStats();
-        std::cout<<"Cartographer: [Initialization Map] Success\n";
+
+        if (verbose_level > 1)
+        {
+          // Show some stats
+          printMapStats();
+          std::cout<<"Cartographer: [Initialization Map] Success\n";
+        }
+        
         return true;
       }
     }
     else
     {
-      std::cout<<"Cartographer: Step: " << step_id_ << ": Regular\n";
+      if (verbose_level > 1)
+        std::cout<<"Cartographer: [Step #" << step_id_ << "] Regular\n";
+
+      if (stats)
+      {
+        stats->startTimer(stats->d_feat_mapping_global_step_prepare);
+      }
+
       // Add frame to local map
       addFrameToGlobalMap(frame, frame->isActive());
-      printMapStats();
+      
       // Add observations to local structure
       addObservationsToLandmarks(frame.get(), params_->map_min_quality_landmark);
-      printMapStats();
+
       // If we have new landmarks
       if (vec_new_landmarks)
       {
@@ -220,24 +295,39 @@ namespace vsslam {
       // Check if we have more points that have been sufficiently observed to add to the system
       addLocalLandmarksToGlobalMap(params_->map_min_quality_landmark);
 
-      printMapStats();
+      if (verbose_level > 1)
+      {
+        // Show some stats
+        printMapStats();
+      }
+
+      if (stats)
+      {
+        stats->stopTimer(stats->d_feat_mapping_global_step_prepare);
+      }
 
       // Globally optimize the system
-      optimizeIncSystem();
-      return true;
+      if (verbose_level > 1)
+        std::cout<<"Cartographer: [Step #" << step_id_ << "] Global optimization\n";
+
+      // Perform global optimization
+      bool b_global_ok = BA_obj_->optimizeGlobal(map_global_, stats);
+
+      return b_global_ok;
     }
   }
 
   void Cartographer::printMapStats()
   {
-    std::cout<<"Cartographer: Global Frames: "<<map_global_.getNumberOfFrames()<<" Global Pts: "<<map_global_.getNumberOfLandmarks()<<"\n"
-        <<"Local Frames: "<<map_local_.getNumberOfFrames()<<" Local Pts: "<<map_local_.getNumberOfLandmarks()<<"\n";
+    std::cout<<"Cartographer: [Map stats] Global Frames/Points: "<<map_global_.getNumberOfFrames()<<" / "<<map_global_.getNumberOfLandmarks()<<"\n"
+            <<"Cartographer: [Map stats] Local Frames/Points: "<<map_local_.getNumberOfFrames()<<" / "<<map_local_.getNumberOfLandmarks()<<"\n";
   }
 
   void Cartographer::setMapStats(VSSLAM_Time_Stats & stats)
   {
     stats.global_frames = map_global_.getNumberOfFrames();
     stats.global_landmarks = map_global_.getNumberOfLandmarks();
+    stats.local_frames = map_local_.getNumberOfFrames();
     stats.local_landmarks = map_local_.getNumberOfLandmarks();
   }
 
@@ -278,7 +368,6 @@ namespace vsslam {
 
         if (std::find(vec_landmarks_frame.begin(), vec_landmarks_frame.end(), map_landmark) == vec_landmarks_frame.end())
         {
-          //std::cout<<"KKKKKKKSSSSSSSSSSS\n";
           // Add to locak map
           local_points.push_back(map_landmark);
         }
@@ -299,12 +388,14 @@ namespace vsslam {
   // -------------------
   bool Cartographer::addFrameToLocalMap(const std::shared_ptr<Frame> & frame, bool b_fixed_frame)
   {
-    //std::cout<<"Cartographer: [Augment Local Map] Add frame: "<<frame->getFrameId()<<" to local map!\n";
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Augment Map] Add local frame with id "<<frame->getFrameId()<<"!\n";
+
     return map_local_.addFrame(frame);
   }
+
   bool Cartographer::addFrameToGlobalMap(const std::shared_ptr<Frame> & frame, bool b_fixed_frame)
   {
-    //std::cout<<"Cartographer: [Augment Global Map] Add frame: "<<frame->getFrameId()<<" to local map!\n";
     bool b_ok = map_global_.addFrame(frame);
 
     if (!b_ok)
@@ -316,6 +407,9 @@ namespace vsslam {
 
     // Add new frame to global system
     addFrameToIncSystem(frame.get(), b_fixed_frame);
+
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Augment Map] Add global frame with id "<<frame->getFrameId()<<"!\n";
 
     return true;
   }
@@ -343,9 +437,8 @@ namespace vsslam {
   {
     const IndexT frame_id = frame->getFrameId();
 
-    std::cout<<"Cartographer: [Augment Map] Add landmarks to structure! Frame id: "<<frame_id<<" # new pts: "<<vec_new_landmarks.size()<<"!\n";
-
-
+    size_t n_local_landmarks = 0; 
+    size_t n_global_landmarks = 0; 
     for (std::unique_ptr<MapLandmark> & landmark_new : vec_new_landmarks)
     {
       MapLandmark * map_landmark;
@@ -354,6 +447,7 @@ namespace vsslam {
       {
         // Add landmark to global map
         map_landmark = addLandmarkToGlobalMap(landmark_new);
+        n_global_landmarks++;
 
         if (time_data.b_enable_features_stats)
         {
@@ -364,6 +458,8 @@ namespace vsslam {
       {
         // Add landmark to local map
         map_landmark = addLandmarkToLocalMap(landmark_new);
+        n_local_landmarks++;
+
         // Mark local landmark as seen in this step
         map_landmark->setObservedInStep(step_id_);
 
@@ -384,6 +480,9 @@ namespace vsslam {
         mo.frame_ptr->setLandmark(mo.feat_id, map_landmark);
       }
     }
+
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Augment Map] Add " << n_global_landmarks << " / " << n_local_landmarks << " (global/local) landmarks to structure from frame with id "<<frame_id<<"\n";
   }
 
   MapLandmark * Cartographer::addLandmarkToLocalMap(std::unique_ptr<MapLandmark> & landmark_new)
@@ -434,6 +533,10 @@ namespace vsslam {
         ++it_map_landmark;
       }
     }
+
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Augment Map] Add " << n_landmarks_ok << " landmarks from local to global structure\n";
+
     return n_landmarks_ok;
   }
 
@@ -457,7 +560,9 @@ namespace vsslam {
       {
         #pragma omp critical
         {
-          std::cout<<"Map landmark id: "<<map_landmark->id_<<" inactive last: "<<map_landmark->getObservedInStep()<<" limit: "<<params_->map_max_inactive_f_local_landmark<<" C: "<<step_id_<<"\n";
+          if (verbose_level > 1)
+            std::cout<<"Map landmark id: "<<map_landmark->id_<<" inactive last: "<<map_landmark->getObservedInStep()<<" limit: "<<params_->map_max_inactive_f_local_landmark<<" C: "<<step_id_<<"\n";
+
           vec_tmp_structure_outliers.push_back(local_landmark_i);
 
           if (time_data.b_enable_features_stats)
@@ -491,7 +596,6 @@ namespace vsslam {
         mo_it->second.frame_ptr->removeLandmark(mo_it->second.feat_id);
       }
 
-
       // Remove possible connection with current local frame
       std::vector<MapLandmark*>::iterator it_landmark_frame = std::find(vec_landmarks_frame.begin(),vec_landmarks_frame.end(),outlier_it->second.get());
 
@@ -505,9 +609,8 @@ namespace vsslam {
       map_local_.map_landmarks_.erase(outlier_it);
     }
 
-    std::cout<<"Cartographer: [Map verification] Local structure before/after outlier rejection: "<<n_local_landmarks_before<<"/"<<map_local_.getNumberOfLandmarks()<<"\n";
-
-
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Map verification] Local structure before/after outlier rejection: "<<n_local_landmarks_before<<"/"<<map_local_.getNumberOfLandmarks()<<"\n";
 
   }
 
@@ -530,7 +633,8 @@ namespace vsslam {
       {
         #pragma omp critical
         {
-          std::cout<<"Map landmark id: "<<map_landmark->id_<<" inactive last: "<<map_landmark->getObservedInStep()<<" limit: "<<params_->map_max_inactive_f_local_landmark<<" C: "<<step_id_<<"\n";
+          if (verbose_level > 1)
+            std::cout<<"Map landmark id: "<<map_landmark->id_<<" inactive last: "<<map_landmark->getObservedInStep()<<" limit: "<<params_->map_max_inactive_f_local_landmark<<" C: "<<step_id_<<"\n";
           vec_tmp_structure_outliers.push_back(local_landmark_i);
 
           if (time_data.b_enable_features_stats)
@@ -556,7 +660,8 @@ namespace vsslam {
         {
           #pragma omp critical
           {
-            std::cout<<"Map landmark id: "<<map_landmark->id_<<" observation error\n";
+            if (verbose_level > 1)
+              std::cout<<"Map landmark id: "<<map_landmark->id_<<" observation error\n";
             vec_tmp_structure_outliers.push_back(local_landmark_i);
 
             if (time_data.b_enable_features_stats)
@@ -605,9 +710,8 @@ namespace vsslam {
       map_local_.map_landmarks_.erase(outlier_it);
     }
 
-    std::cout<<"Cartographer: [Map verification] Local structure before/after outlier rejection: "<<n_local_landmarks_before<<"/"<<map_local_.getNumberOfLandmarks()<<"\n";
-
-
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Map verification] Local structure before/after outlier rejection: "<<n_local_landmarks_before<<"/"<<map_local_.getNumberOfLandmarks()<<"\n";
 
   }
 
@@ -621,8 +725,8 @@ namespace vsslam {
   )
   {
     const IndexT & frame_id = frame->getFrameId();
-    std::cout<<"Cartographer: [Augment Map] Add observations to landmarks! Frame id: "<<frame_id<<"!\n";
 
+    size_t n_observations_added = 0;
     // Loop through matches and add observations:
     //   - if valid frame and local point we increase the counter
     for (IndexT feat_id = 0; feat_id < frame->getNumberOfFeatures(); ++feat_id)
@@ -633,6 +737,7 @@ namespace vsslam {
         continue;
       // Add observation to the landmark
       map_landmark->addObservation(frame,feat_id);
+      n_observations_added++;
       // If landmark is already in global we add observation to the system
       // If landmark becomes valid with this observation we add it to global map
       if (b_global_map_intialized_)
@@ -656,7 +761,7 @@ namespace vsslam {
           {
             time_data.added_local_to_global_landmarks++;
           }
-
+          n_observations_added++;
         }
       }
       else
@@ -667,6 +772,8 @@ namespace vsslam {
       updateBestLandmarkDescriptor(map_landmark);
     }
 
+    if (verbose_level > 1)
+      std::cout<<"Cartographer: [Augment Map] Add " << n_observations_added << " observations to landmarks from frame with id "<<frame_id<<"!\n";
   }
 
 
@@ -691,26 +798,29 @@ namespace vsslam {
     {
     case MAP_OPTIMIZATION_TYPE::CERES:
     {
-      std::cout<<"VSSLAM: [Cartographer] Ceres Global Optimization Mode\n";
-      VSSLAM_BA_Ceres::BA_options_Ceres options(map_global_.map_frame_type_, map_global_.map_landmark_type_, true, true);
+      if (verbose_level > 1)
+        std::cout<<"VSSLAM: [Cartographer] Ceres Global Optimization Mode\n";
 
+      VSSLAM_BA_Ceres::BA_options_Ceres options(map_global_.map_frame_type_, map_global_.map_landmark_type_, true, true);
       options.b_export_graph_file = params_->b_export_graph_file;
-      options.s_graph_file = params_->s_graph_file_path;
+      options.s_graph_file = stlplus::create_filespec(params_->s_output_folder, params_->s_graph_file_path);
 
       BA_obj_ = std::unique_ptr<VSSLAM_BA>(new VSSLAM_BA_Ceres(options));
+      BA_obj_->setVerboseLevel(verbose_level);
 
       break;
     }
     case MAP_OPTIMIZATION_TYPE::SLAMPP:
     {
-      std::cout<<"VSSLAM: [Cartographer] Slam++ Global Optimization Mode\n";
-      VSSLAM_BA_SlamPP::BA_options_SlamPP options(map_global_.map_frame_type_, map_global_.map_landmark_type_, true, true);
+      if (verbose_level > 1)
+        std::cout<<"VSSLAM: [Cartographer] Slam++ Global Optimization Mode\n";
 
+      VSSLAM_BA_SlamPP::BA_options_SlamPP options(map_global_.map_frame_type_, map_global_.map_landmark_type_, true, true);
       options.b_export_graph_file = params_->b_export_graph_file;
-      options.s_graph_file = params_->s_graph_file_path;
+      options.s_graph_file = stlplus::create_filespec(params_->s_output_folder, params_->s_graph_file_path);
 
       BA_obj_ = std::unique_ptr<VSSLAM_BA>(new VSSLAM_BA_SlamPP(options));
-
+      BA_obj_->setVerboseLevel(verbose_level);
       break;
     }
     }
@@ -728,14 +838,6 @@ namespace vsslam {
   {
     BA_obj_->addFrameToGlobalSystem(frame,b_frame_fixed);
   };
-  bool Cartographer::optimizeIncSystem()
-  {
-    std::cout<<"Cartographer: [BA] Global optimization step: "<<step_id_<<"!\n";
-    // Perform global optimizaation
-    bool b_ok = BA_obj_->optimizeGlobal(map_global_);
-    //bool b_ok = true;
-    return b_ok;
-  };
 
 
   bool Cartographer::optimizeLocalMap
@@ -750,7 +852,8 @@ namespace vsslam {
     case MAP_OPTIMIZATION_TYPE::CERES:
     {
       VSSLAM_BA_Ceres::BA_options_Ceres options;
-      return VSSLAM_BA_Ceres::OptimizeLocalSystem(frame_i,vec_new_landmarks,b_use_loss_function,options);
+      options.b_use_sim3_local = true;
+      return VSSLAM_BA_Ceres::OptimizeLocalSystem(frame_i,vec_new_landmarks,b_use_loss_function,options, verbose_level);
       break;
     }
     case MAP_OPTIMIZATION_TYPE::SLAMPP:
@@ -774,7 +877,7 @@ namespace vsslam {
     case MAP_OPTIMIZATION_TYPE::CERES:
     {
       VSSLAM_BA_Ceres::BA_options_Ceres options;
-      return VSSLAM_BA_Ceres::OptimizePose(frame,matches_map_cur_idx,b_use_loss_function,options);
+      return VSSLAM_BA_Ceres::OptimizePose(frame,matches_map_cur_idx,b_use_loss_function,options, verbose_level);
       break;
     }
     case MAP_OPTIMIZATION_TYPE::SLAMPP:
@@ -814,9 +917,10 @@ namespace vsslam {
       << '\n' << "property double x"
       << '\n' << "property double y"
       << '\n' << "property double z"
-      << '\n' << "property uchar red"
-      << '\n' << "property uchar green"
-      << '\n' << "property uchar blue"
+      << '\n' << "property double uncertainty"
+      //<< '\n' << "property uchar red"
+      //<< '\n' << "property uchar green"
+      //<< '\n' << "property uchar blue"
       << '\n' << "end_header" << std::endl;
 
     for (auto & frame_it : map_global_.map_frame_)
@@ -827,7 +931,9 @@ namespace vsslam {
           << center(0) << ' '
           << center(1) << ' '
           << center(2) << ' '
-          << "0 255 0\n";
+          << "0.0"
+          //<< "0 255 0"
+          << "\n";
     }
 
     if (b_export_local_scene)
@@ -840,7 +946,9 @@ namespace vsslam {
             << center(0) << ' '
             << center(1) << ' '
             << center(2) << ' '
-            << "255 255 0\n";
+            << "0.0"
+            //<< "255 255 0";
+            << "\n";
       }
     }
 
@@ -854,7 +962,9 @@ namespace vsslam {
         << pt_3D_w(0) << ' '
         << pt_3D_w(1) << ' '
         << pt_3D_w(2) << ' '
-        << "255 255 255\n";
+        << map_landmark->cov_X_.trace()
+        //<< "255 255 255"
+        << "\n";
     }
 
     if (b_export_local_scene)
@@ -869,7 +979,9 @@ namespace vsslam {
           << pt_3D_w(0) << ' '
           << pt_3D_w(1) << ' '
           << pt_3D_w(2) << ' '
-          << "255 0 0\n";
+          << "0.0"
+          //<< "255 0 0"
+          << "\n";
       }
     }
 
@@ -878,6 +990,24 @@ namespace vsslam {
     stream.close();
 
     return bOk;
+  }
+
+  bool Cartographer::exportStateSE3(std::string filename)
+  {
+    if (verbose_level>1)
+      std::cout<<"Cartographer: Export State SE3\n";
+
+    BA_obj_->exportStateSE3(filename);
+    return true;
+  }
+
+  bool Cartographer::exportDiagonalMarginals(std::string filename)
+  {
+    if (verbose_level>1)
+      std::cout<<"Cartographer: Export Diagonal Marginals\n";
+
+    BA_obj_->exportDiagonalMarginals(filename);
+    return true;
   }
 
 }

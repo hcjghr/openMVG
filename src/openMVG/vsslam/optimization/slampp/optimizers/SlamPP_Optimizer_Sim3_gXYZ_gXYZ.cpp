@@ -19,11 +19,12 @@ SlamPP_Optimizer_Sim3_gXYZ_gXYZ::SlamPP_Optimizer_Sim3_gXYZ_gXYZ
   bool b_use_schur,
 	bool b_do_marginals,
 	bool b_do_icra_style_marginals) // throw(srd::bad_alloc)
-	:SlamPP_Optimizer(undefined_camera_id),m_solver(m_system, TIncrementalSolveSetting(),
+	:SlamPP_Optimizer(undefined_camera_id),m_solver(m_system, TIncrementalSolveSetting(solve::nonlinear, frequency::Every(-1)),
 	    TMarginalsComputationPolicy((b_do_marginals)? marginals::do_calculate : marginals::do_not_calculate,
 	    frequency::Never(), mpart_Diagonal, mpart_Diagonal), // batch marginals
 	    b_verbose, CLinearSolverType(), b_use_schur)
 {
+	n_dummy_param = 1;
   m_solver.Set_ICRA15_Style_IncrementalMargs(b_do_icra_style_marginals); // !!
 }
 
@@ -84,6 +85,18 @@ void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Set_AllBatch(bool b_all_batch)
 	//m_p_optimizer->r_Solver().Set_AllBatch(b_all_batch);
 }
 
+void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Set_ForceIncSchur(bool b_force_inc_schur)
+{
+  m_solver.Set_ForceIncSchur(b_force_inc_schur);
+	//m_p_optimizer->r_Solver().Set_ForceIncSchur(b_force_inc_schur);
+}
+
+void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Set_RelinThreshold(double f_relin_thresh)
+{
+  m_solver.Set_RelinearizationThreshold(f_relin_thresh);
+	//m_p_optimizer->r_Solver().Set_RelinearizationThreshold(f_relin_thresh);
+}
+
 // Optimize
 void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Optimize(size_t n_max_iteration_num /*= 5*/,
 	double f_min_dx_norm /*= .01*/, double f_min_dl_norm /*= .01*/) // throw(srd::bad_alloc, std::runtime_error)
@@ -95,7 +108,7 @@ void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Optimize(size_t n_max_iteration_num /*= 5*
 // Add cameras
 double * SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Add_CamVertex(size_t n_vertex_id, const Eigen::Matrix<double, 12, 1> &v_cam_state) // throw(srd::bad_alloc)
 {
-  CVertexCamSim3 &r_cam0 = m_system.r_Get_Vertex<CVertexCamSim3>(n_vertex_id, v_cam_state);
+ CVertexCamSim3 &r_cam0 = m_system.r_Get_Vertex<CVertexCamSim3>(n_vertex_id, v_cam_state);
 	//CVertexCamSim3 &r_cam0 = m_p_optimizer->r_System().r_Get_Vertex<CVertexCamSim3>(n_vertex_id, v_cam_state);
 	return r_cam0.r_v_State().data();
 }
@@ -105,13 +118,15 @@ double * SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Add_CamVertexFixed(size_t n_vertex_id,
 {
   CVertexCamSim3 &r_cam0 = m_system.r_Get_Vertex<CVertexCamSim3>(n_vertex_id, v_cam_state);
   //CVertexCamSim3 &r_cam0 = m_p_optimizer->r_System().r_Get_Vertex<CVertexCamSim3>(n_vertex_id, v_cam_state);
-  // Add unary factor (UF) to make the optimized system positive definite
 
+  // Add unary factor (UF) to make the optimized system positive definite
+/*
   m_system.r_Add_Edge(CEdgePoseCamSim3(n_vertex_id, m_undefined_camera_id,
         Eigen::Vector7d::Zero(), Eigen::Matrix7d::Identity() * 100, m_system));
-
+*/
   //m_p_optimizer->r_System().r_Add_Edge(CEdgePoseCamSim3(n_vertex_id, m_undefined_camera_id,
   //      Eigen::Vector7d::Zero(), Eigen::Matrix7d::Identity() * 100, m_p_optimizer->r_System()));
+
   // Return pointer to state of vertex
   return r_cam0.r_v_State().data();
 }
@@ -124,11 +139,13 @@ double * SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Add_XYZVertex(size_t n_vertex_id, size
   n_owner_id = m_undefined_camera_id;
 
   _TyLandmark &r_landmark = m_system.r_Get_Vertex<_TyLandmark>(n_vertex_id,
-      CParserBase::TVertexXYZ(int(n_vertex_id), v_xyz_position(0), v_xyz_position(1), v_xyz_position(2))); // initialize via parse primitive, let the vertex class convert to its representation
+	CParserBase::TVertexXYZ(int(n_vertex_id), v_xyz_position(0), v_xyz_position(1), v_xyz_position(2))); // initialize via parse primitive, let the vertex class convert to its representation
 
   //CBAOptimizerCore_Sim3_gXYZ_gXYZ::_TyLandmark &r_landmark = m_p_optimizer->r_System().r_Get_Vertex<CBAOptimizerCore_Sim3_gXYZ_gXYZ::_TyLandmark>(n_vertex_id,
   //  CParserBase::TVertexXYZ(int(n_vertex_id), v_xyz_position(0), v_xyz_position(1), v_xyz_position(2))); // initialize via parse primitive, let the vertex class convert to its representation
+
   m_camera_ownerships[n_vertex_id] = n_owner_id; // vertex defined in global space
+
   return r_landmark.r_v_State().data();
 }
 
@@ -136,14 +153,24 @@ double * SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Add_XYZVertex(size_t n_vertex_id, size
 void SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Add_P2CSim3GEdge(size_t n_landmark_vertex_id, size_t n_cam_vertex_id,
 	const Eigen::Vector2d &v_observation, const Eigen::Matrix2d &t_information) // throw(srd::bad_alloc)
 {
-  m_system.r_Add_Edge(_TyObservation(n_landmark_vertex_id, n_cam_vertex_id,
+	m_system.r_Add_Edge(_TyObservation(n_landmark_vertex_id, n_cam_vertex_id,
       v_observation, t_information, m_system));
 
 	//m_p_optimizer->r_System().r_Add_Edge(CBAOptimizerCore_Sim3_gXYZ_gXYZ::_TyObservation(n_landmark_vertex_id, n_cam_vertex_id,
 	//	v_observation, t_information, m_p_optimizer->r_System()));
 }
 
-
+// get covariance
+Eigen::MatrixXd SlamPP_Optimizer_Sim3_gXYZ_gXYZ::Get_CovarianceBlock(size_t element_1_slampp_id, size_t element_2_slampp_id)
+{
+	
+	if(!m_solver.r_MarginalCovariance().r_SparseMatrix().b_Empty())
+	{
+  	const CUberBlockMatrix &r_marginals = m_solver.r_MarginalCovariance().r_SparseMatrix();
+		return r_marginals.t_GetBlock_Log(element_1_slampp_id, element_2_slampp_id);
+	}
+	return Eigen::Matrix3d::Zero();
+}
 
 
 

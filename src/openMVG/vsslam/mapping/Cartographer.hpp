@@ -27,6 +27,8 @@ namespace vsslam {
 class Cartographer
 {
 private:
+  int verbose_level = 0;
+
   /// Parameters Object
   std::shared_ptr<VSSLAM_Parameters> params_;
   // Feature extractor
@@ -62,6 +64,12 @@ public:
   );
 
 
+  void setVerboseLevel(int level)
+  {
+    verbose_level = level;
+    std::cout<<"Cartographer: Verbose level: " << verbose_level << "\n";
+  }
+  
   void setFeatureExtractor(Abstract_Feature_Extractor * extractor)
   {
     feature_extractor_ = extractor;
@@ -94,7 +102,8 @@ public:
   bool addStep
   (
     std::shared_ptr<Frame> & frame,
-    NewMapLandmarks * vec_new_landmarks
+    NewMapLandmarks * vec_new_landmarks,
+    VSSLAM_Time_Stats * stats = nullptr
   );
 
   void getLocalMapPoints
@@ -160,7 +169,6 @@ public:
 
   void addFrameToIncSystem(Frame * frame, bool b_frame_fixed = false);
 
-  bool optimizeIncSystem();
 
   bool optimizeLocalMap
   (
@@ -182,6 +190,11 @@ public:
   // -- Export
   // -------------------
   bool exportSceneToPly(const std::string & filename, bool b_export_local_scene);
+
+  bool exportStateSE3(std::string filename);
+  bool exportDiagonalMarginals(std::string filename);
+
+
   void setMapStats(VSSLAM_Time_Stats & stats);
 };
 

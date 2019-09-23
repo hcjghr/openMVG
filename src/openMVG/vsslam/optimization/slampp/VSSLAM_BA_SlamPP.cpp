@@ -26,7 +26,9 @@ VSSLAM_BA_SlamPP::VSSLAM_BA_SlamPP
   problem_ = std::unique_ptr<SlamPP_Optimizer>(new SlamPP_Optimizer_Sim3_gXYZ_gXYZ(options_.undefined_cam_id, options_.b_verbose_, options_.b_use_schur_, options_.b_do_marginals_, options_.b_do_icra_style_marginals_));
   // Set initial settings
   problem_->Set_AllBatch(options_.b_all_batch);
+  problem_->Set_ForceIncSchur(options_.b_force_inc_schur);
   problem_->Set_UpdateThreshold(options_.f_update_thresh);
+  problem_->Set_RelinThreshold(options_.f_relin_thresh);
   problem_->Set_TrustRadius(options_.f_trust_radius);
   problem_->Set_TrustRadius_Persistence(options_.b_trust_radius_persistent);
 
@@ -60,7 +62,8 @@ bool VSSLAM_BA_SlamPP::OptimizeLocalSystem
   Frame * frame_i,
   NewMapLandmarks & vec_new_landmarks,
   bool b_use_loss_function,
-  BA_options_SlamPP & ba_options
+  BA_options_SlamPP & ba_options,
+  int verbose_level
 )
 {
 
@@ -73,7 +76,8 @@ bool VSSLAM_BA_SlamPP::OptimizePose
   Frame * frame,
   Hash_Map<MapLandmark *,IndexT> & matches_map_cur_idx,
   bool b_use_loss_function,
-  BA_options_SlamPP & ba_options
+  BA_options_SlamPP & ba_options,
+  int verbose_level
 )
 {
   return false;
@@ -87,10 +91,10 @@ bool VSSLAM_BA_SlamPP::addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed)
   const IndexT & frame_id = frame->getFrameId();
   const IndexT & cam_id = frame->getCamId();
 
-  std::cout<<"OMVG: Add Frame: frame id: "<<frame_id<<"\n";
   if (map_poses_.find(frame_id)!=map_poses_.end())
   {
-    std::cout<<"Cartographer: [Slam++ GlobalBA] Frame "<<frame->getFrameId()<< "already in the system!";
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Slam++] Frame "<<frame->getFrameId()<< "already in the system!";
     return false;
   }
 
@@ -113,7 +117,10 @@ bool VSSLAM_BA_SlamPP::addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed)
   // Add camera to map
       map_poses_[frame_id] = std::make_pair(frame_slampp_id,ptr_state_frame);
 
-  std::cout<<"Cartographer: [Slam++ GlobalBA] Add frame: "<<frame->getFrameId()<< " Fixed: "<<b_frame_fixed<<" to global map!\n";
+  if (verbose_level>1)
+  {
+    std::cout<<"Cartographer: [Global][BA - Slam++] Add frame: "<<frame->getFrameId()<< " Fixed: "<<b_frame_fixed<<" to global map!\n";
+  }
 
   // Graph file
   if (options_.b_export_graph_file)
@@ -146,13 +153,15 @@ bool VSSLAM_BA_SlamPP::addLandmarkToGlobalSysyem(MapLandmark * map_landmark)
 {
   // Create vertex for Landmark
   const size_t landmark_slampp_id = getNextVertexId();
-  std::cout<<"OMVG: Add landmark: landmark id: "<<map_landmark->id_<<"\n";
-  std::cout<<"Slam++: Add landmark id: "<<landmark_slampp_id<<"\n";
+  
+  if (verbose_level>1)
+  {
+    std::cout<<"Cartographer: [Global][BA - Slam++] Add landmark id: "<<landmark_slampp_id<<"\n";
+  }
   // Add landmarks as global point : m_undefined_camera_id as no owner
   double * landmark_ptr = problem_->Add_XYZVertex(landmark_slampp_id,options_.undefined_cam_id, map_landmark->X_);
 
   // Graphfile
-
   if (options_.b_export_graph_file)
   {
     slamPP_GraphFile << "VERTEX_XYZ"
@@ -176,11 +185,12 @@ bool VSSLAM_BA_SlamPP::addLandmarkToGlobalSysyem(MapLandmark * map_landmark)
     const IndexT & frame_id = frame->getFrameId();
     const IndexT & cam_id_frame = frame->getCamId();
     IntrinsicBase * & cam_intrinsic = frame->getCameraIntrinsics();
-    std::cout<<"OMVG: Add observation by global: landmark id: "<<map_landmark->id_<<" frame: "<<frame_id<<" feat: "<<feat_id_frame<<"\n";
+    
     // Add frame to the problem if its not added yet
     if (map_poses_.find(frame_id) == map_poses_.end())
     {
-      std::cout<<"Cartographer: [SlamPP GlobalBA] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
+      if (verbose_level>1)
+        std::cout<<"Cartographer: [Global][BA - Slam++] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
       return false;
     }
 
@@ -218,18 +228,19 @@ bool VSSLAM_BA_SlamPP::addObservationToGlobalSystem(MapLandmark * map_landmark, 
   const IndexT & cam_id_frame = frame->getCamId();
   IntrinsicBase * & cam_intrinsic = frame->getCameraIntrinsics();
 
-  std::cout<<"OMVG: Add observation: landmark id: "<<landmark_id<<" frame: "<<frame_id<<" feat: "<<feat_id_frame<<"\n";
   // Add frame to the problem if its not added yet
   if (map_poses_.find(frame_id) == map_poses_.end())
   {
-    std::cout<<"Cartographer: [SlamPP GlobalBA] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Slam++] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
     return false;
   }
 
   // Check if landmark exists in the system
   if (map_landmarks_.find(landmark_id) == map_landmarks_.end() || !map_landmark->isActive())
   {
-    std::cout<<"Cartographer: [SlamPP GlobalBA] Adding landmark: "<<landmark_id<<" is not yet in the system!! Skipping landmark!";
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Slam++] Adding landmark: "<<landmark_id<<" is not yet in the system!! Skipping landmark!";
     return false;
   }
 
@@ -247,7 +258,8 @@ bool VSSLAM_BA_SlamPP::addObservationToGlobalSystem(MapLandmark * map_landmark, 
 
     if (b_exists)
     {
-      std::cout<<"OBSERVATION EXISTS!!!!\n";
+      if (verbose_level>1)
+        std::cout<<"Cartographer: [Global][BA - Slam++] Observation exists!\n";
       return false;
     }
     else
@@ -265,7 +277,11 @@ bool VSSLAM_BA_SlamPP::addObservationToGlobalSystem(MapLandmark * map_landmark, 
   const size_t landmark_slampp_id = map_landmarks_.find(landmark_id)->second.first;
 
 
-  std::cout<<"Slam++: Add observation: landmark id: "<<landmark_slampp_id<<" frame: "<<frame_slampp_id<<"\n";
+  if (verbose_level>1)
+  {
+    std::cout<<"Cartographer: [Global][BA - Slam++] Add observation: landmark id: "<<landmark_slampp_id<<" frame: "<<frame_slampp_id<<"\n";
+  }
+
   // Add measurement edge
   Eigen::Matrix2d inf_mat = frame->getFeatureSqrtInfMatrix(feat_id_frame).cwiseProduct(frame->getFeatureSqrtInfMatrix(feat_id_frame));
   problem_->Add_P2CSim3GEdge(landmark_slampp_id,frame_slampp_id,frame->getFeaturePosition(feat_id_frame), inf_mat);
@@ -285,7 +301,8 @@ bool VSSLAM_BA_SlamPP::addObservationToGlobalSystem(MapLandmark * map_landmark, 
   return true;
 }
 
-bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global)
+
+bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats * stats)
 {
 
   // Export consistency marker
@@ -296,23 +313,19 @@ bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global)
     slamPP_GraphFile.flush();
   }
 
-  for (auto & frame_it : map_poses_)
+  if (stats)
   {
-    const IndexT & frame_id = frame_it.first;
-    Frame * frame = map_global.map_frame_[frame_id].get();
-    std::cout<<"Frame before: "<<frame->getFrameId()<<" T: "<<frame->getTransformationMatrix()<<"\n";
-
-    Eigen::Matrix<double, 12, 1> vec_state_frame;
-    // Get pose in the WORLD reference frame
-    frame->getPose_StateVector(vec_state_frame,nullptr);
-    std::cout<<"sim3: "<<vec_state_frame<<"\n";
-    std::cout<<"Scale: "<<frame->getPoseScale()<<"\n";
+    stats->startTimer(stats->d_feat_mapping_global_step_BA);
   }
 
   // Optimize the solution
   problem_->Optimize(options_.n_max_inc_iters,options_.f_inc_nlsolve_thresh, options_.f_inc_nlsolve_thresh);
 
-  std::cout<<"UPDATE DATA\n";
+  if (stats)
+  {
+    stats->stopTimer(stats->d_feat_mapping_global_step_BA);
+    stats->startTimer(stats->d_feat_mapping_global_step_update);
+  }
 
   // Update frames with refined data
   for (auto & frame_it : map_poses_)
@@ -323,13 +336,11 @@ bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global)
     Eigen::Map<Eigen::VectorXd> frame_state_after = problem_->r_Vertex_State(frame_it.second.first);;
     Eigen::Matrix<double, 7, 1>  vec_state = frame_state_after.template head<7>();
     frame->setPose_sim3(vec_state,frame->getReferenceFrame());
-    std::cout<<"Frame: "<<frame->getFrameId()<<" T: "<<frame->getTransformationMatrix()<<"\n";
-    std::cout<<"sim3: "<<vec_state<<"\n";
-    std::cout<<"Scale: "<<frame->getPoseScale()<<"\n";
   }
 
-  // Upate landmarks with refined data
 
+
+  // Upate landmarks with refined data
   for (auto & landmark_it : map_landmarks_)
   {
     const IndexT & landmark_id = landmark_it.first;
@@ -337,16 +348,45 @@ bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global)
     // Get landmark pointer from the structure
     MapLandmark * landmark = map_global.getLandmark(landmark_id).get();
 
-
     // Recover value from slampp
     Eigen::Map<Eigen::VectorXd> landmark_state_after = problem_->r_Vertex_State(landmark_slampp_id);
     landmark->X_ = landmark_state_after;
-    //std::cout<<"Landmark id:"<<landmark->id_<<" X: "<<landmark->X_<<"\n";
+
+    // Recover covariance
+    landmark->cov_X_ = problem_->Get_CovarianceBlock(landmark_slampp_id,landmark_slampp_id);
+
+    std::cout << "Landmark: " << landmark_slampp_id << "\n";
+    std::cout << landmark->cov_X_ << "\n";
+
   }
 
-  std::cout<<"Cartographer: [Slam++ GlobalBA] Optimized OK!\n";
+  if (stats)
+  {
+    stats->stopTimer(stats->d_feat_mapping_global_step_update);
+  }
+
+  if (verbose_level>1)
+    std::cout<<"Cartographer: [Global][BA - SlamPP] Optimized OK!\n";
 
 
+  return true;
+}
+
+bool VSSLAM_BA_SlamPP::exportStateSE3(std::string filename)
+{
+  if (verbose_level>1)
+    std::cout<<"Cartographer: [SlamPP] Export State SE3\n";
+
+  problem_->Dump_State_SE3(filename.c_str());
+  return true;
+}
+
+bool VSSLAM_BA_SlamPP::exportDiagonalMarginals(std::string filename)
+{
+  if (verbose_level>1)
+    std::cout<<"Cartographer: [SlamPP] Export Diagonal Marginals\n";
+
+  problem_->Dump_Marginals(filename.c_str());
   return true;
 }
 

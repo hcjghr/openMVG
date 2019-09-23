@@ -34,8 +34,12 @@ public:
   {
     size_t undefined_cam_id = size_t(-1);//std::numeric_limits<size_t>::max() / 2 + 1;
 
+    // Slam++ settings
+    bool b_all_batch = false;
+    bool b_force_inc_schur = false;
+
     bool b_use_schur_ = true;
-    bool b_do_marginals_ = false;
+    bool b_do_marginals_ = true;
     bool b_do_icra_style_marginals_ = false;
     size_t n_skip_optimization = 0; //Optimize every n included cameras (0 - means every)
 
@@ -44,15 +48,17 @@ public:
      is 5, the default update threshold is 10^-4 and the default trust radius is 0.2.
      */
 
+    double f_update_thresh = 0.0001;//10^(-4);  //dx-threshold  (using update threshold 0, disabling update threshold)
+    double f_relin_thresh = 0.0;
+    double f_trust_radius = 0.2;  // trust-radius
+    bool b_trust_radius_persistent = false;
     int n_max_inc_iters = 1;  //max-nonlinear-solve-iters
+
     int n_max_final_iters = 5;  //max-final-nonlinear-solve-iters
     double f_inc_nlsolve_thresh = .005; //nonlinear-solve-error-thresh
     double f_final_nlsolve_thresh = .005; //final-nonlinear-solve-error-thresh
-    double f_trust_radius = 0.2;  // trust-radius
-    bool b_trust_radius_persistent = false;
-    double f_update_thresh = 0.0f;  //dx-threshold  (using update threshold 0, disabling update threshold)
-
-    bool b_all_batch = false;
+    
+    
 
     bool b_use_loss_function_;
 
@@ -97,7 +103,8 @@ public:
     Frame * frame_i,
     NewMapLandmarks & vec_new_landmarks,
     bool b_use_loss_function,
-    BA_options_SlamPP & ba_options
+    BA_options_SlamPP & ba_options,
+    int verbose_level
   );
 
   static bool OptimizePose
@@ -105,14 +112,17 @@ public:
     Frame * frame,
     Hash_Map<MapLandmark *,IndexT> & matches_map_cur_idx,
     bool b_use_loss_function,
-    BA_options_SlamPP & ba_options
+    BA_options_SlamPP & ba_options,
+    int verbose_level
   );
 
   bool addObservationToGlobalSystem(MapLandmark * map_point, MapObservation * map_observation)override;
   bool addLandmarkToGlobalSysyem(MapLandmark * map_point)override;
   bool addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed = false)override;
-  bool optimizeGlobal(VSSLAM_Map & map_global)override;
+  bool optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats * stats = nullptr)override;
 
+  bool exportStateSE3(std::string filepath)override;
+  bool exportDiagonalMarginals(std::string filepath)override;
 
 };
 

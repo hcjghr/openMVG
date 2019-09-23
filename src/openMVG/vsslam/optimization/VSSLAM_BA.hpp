@@ -21,6 +21,10 @@ namespace vsslam {
 
 class VSSLAM_BA
 {
+protected:
+  //graph file
+  std::ofstream slamPP_GraphFile;
+  int verbose_level = false;
 public:
   struct BA_options
   {
@@ -45,12 +49,18 @@ public:
   virtual bool addObservationToGlobalSystem(MapLandmark * map_point, MapObservation * map_observation) =0;
   virtual bool addLandmarkToGlobalSysyem(MapLandmark * map_point) =0;
   virtual bool addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed) =0;
-  virtual bool optimizeGlobal(VSSLAM_Map & map_global) =0;
+  virtual bool optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats * stats) =0;
 
-protected:
-  //graph file
-  std::ofstream slamPP_GraphFile;
 
+  virtual bool exportStateSE3(std::string filepath) =0;
+  virtual bool exportDiagonalMarginals(std::string filepath) =0;
+
+
+  void setVerboseLevel(int level)
+  {
+    verbose_level = level;
+    std::cout<<"VSSLAM BA: Verbose level: " << verbose_level << "\n";
+  }
 public:
 };
 

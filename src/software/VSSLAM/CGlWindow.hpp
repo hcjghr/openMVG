@@ -74,6 +74,11 @@ struct CGlWindow
     glEnd();
   }
 
+  void setTitle(std::string s_title)
+  {
+    glfwSetWindowTitle(_window, s_title.c_str());
+  }
+
   void Swap()
   {
     glfwSwapBuffers(_window);

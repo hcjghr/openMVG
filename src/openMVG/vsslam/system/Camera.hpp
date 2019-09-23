@@ -129,9 +129,10 @@ public:
     return b_calibrated_;
   }
   bool isPointInImage(const Vec2 & pt) const
-  {
-    if (pt(0) < f_img_borders[0] || pt(0) > f_img_borders[2] || pt(1) < f_img_borders[1] || pt(1) > f_img_borders[3])
+  { if (pt(0) < f_img_borders[0] || pt(0) > f_img_borders[2] || pt(1) < f_img_borders[1] || pt(1) > f_img_borders[3])
+    {
       return false;
+    }
     return true;
   }
   void computeImageBorders()
@@ -152,7 +153,7 @@ public:
       pt2D_cp << 0,w,w,0,w/2,w,w/2,0,     0, 0, h, h, 0, h/2, h, h/2;
       ptr_intrinsic_undist_->get_ud_pixel(pt2D_cp);
       // TODO: finish this
-
+      std::cout << "Compute camera borders - DIST: NOT COMPLETED\n";
     }
     else
     {
@@ -162,6 +163,21 @@ public:
       f_img_borders[2] = ptr_intrinsic_valid_->w();
       f_img_borders[3] = ptr_intrinsic_valid_->h();
     }
+  }
+
+  void printParameters()
+  {
+    std::cout << "VSSLAM [Camera] Camera: " << id_ << "\n"
+              << "\tImage size: " << ptr_intrinsic_valid_->w() << ", " << ptr_intrinsic_valid_->h() << "\n"
+              << "\tIntrinsics: (f/ppx/ppy/dist): ";
+    for (auto & param :  ptr_intrinsic_valid_->getParams())
+    {
+                std::cout << param << " ";
+    }
+    std::cout << "\n"
+              << "\tCalibrated: " << b_calibrated_ << "\n"
+              << "\tImage boundaries: " << f_img_borders[0] << ", " << f_img_borders[1] << ", " << f_img_borders[2] << ", " << f_img_borders[3] << "\n";
+    std::cout << "\tImage mask: " << (ptr_img_mask_==nullptr?"NO":"YES") << "\n";
   }
 
 };

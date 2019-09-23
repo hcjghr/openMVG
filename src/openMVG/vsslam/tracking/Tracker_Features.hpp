@@ -36,6 +36,13 @@ private:
 
   Hash_Map<MapLandmark *,IndexT> track_putative_matches_frame_current;
 
+/*
+  size_t n_max_frames_not_tracked = 100;  // Max number of frames between two tracked frames
+  size_t n_min_global_landmarks_tracked = 50; // Min number of global landmarks needed to be tracked (otherwise new frame)
+  size_t n_min_global_landmarks_to_check_prev_stats = 100;  // Min number of global landmarks to be confident (otherwise check stats of prev frame)
+  float f_min_ratio_of_landmarks_tracked_reference_frame = 0.6; // Min number of landmark tracked compared to prev frame (otherwise new frame)
+  float f_max_ratio_of_landmarks_tracked_prev_frame = 1.4;  // If more than ratio of landmarks tracked add frame
+*/
 
 public:
   Tracker_Features
@@ -84,10 +91,12 @@ public:
   // --------------------------
   //   New keyframes:
   // --------------------------
-  bool needNewKeyframe
+  size_t needNewKeyframe
   (
     Frame * frame
   ) const;
+
+  void printKeyFrameReason( size_t & keyframe_reason) override;
 
   void findNewCandidateLandmarks(Frame * frame, NewMapLandmarks & vec_new_map_landmarks);
   // -------------------

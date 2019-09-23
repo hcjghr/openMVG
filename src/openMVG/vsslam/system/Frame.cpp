@@ -78,6 +78,7 @@ namespace vsslam {
   bool Frame::getProjectedPoint(const MapLandmark * map_landmark, Vec2 & pt_2D_frame) const
   {
     Vec3 pt_3D_frame;
+
     PoseEstimator::getRelativePointPosition(map_landmark->X_,map_landmark->getReferenceFrame(),pt_3D_frame,this);
 
     if (pt_3D_frame(2)<=0)
@@ -406,12 +407,12 @@ namespace vsslam {
     {
       frames_connected_ordered[i] = vec_frames_n_landmarks[n_frames-i-1].second;
     }
-
+/*
     for (size_t i = 0; i < n_return_frames; i++)
     {
       std::cout<<"Local frame: "<<frames_connected_ordered[i]->getFrameId()<<" #: "<<vec_frames_n_landmarks[n_frames-i-1].first<<"\n";
     }
-
+*/
   }
 
 

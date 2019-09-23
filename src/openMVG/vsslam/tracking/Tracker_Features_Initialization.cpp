@@ -32,7 +32,9 @@ namespace vsslam {
       // Reset tracking if we dont already have reference frame (shouldnt happen)
       if (!frame_track_init)
       {
-        std::cout<<"Tracker: [Initialization] Missing reference frame! Start initialization with current\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] Missing reference frame! Start initialization with current\n";
+       
         startInitialization();
         return false;
       }
@@ -57,7 +59,8 @@ namespace vsslam {
       );
 
 
-      std::cout<<"Tracker: [Initialization] [Matching All-All 2D-2D]: " << vec_putative_matches_ref_cur_idx.size() << "\n";
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] [Matching All-All 2D-2D]: " << vec_putative_matches_ref_cur_idx.size() << "\n";
 
       if (display_data.b_enable_display)
         display_data.addDisplayStep("Initialization: Initial 2D-2D matches",frame_track_init.get(), frame_track_current.get(),vec_putative_matches_ref_cur_idx);
@@ -65,7 +68,8 @@ namespace vsslam {
       // If we dont have enough matches with reference image we set current frame as new reference image
       if (vec_putative_matches_ref_cur_idx.size() < params_->init_track_min_matches)
       {
-        std::cout<<"Tracker: [Initialization] Insufficient # matches! Setting this frame as new initialization reference frame\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] Insufficient # matches! Setting this frame as new initialization reference frame\n";
         startInitialization();
         return false;
       }
@@ -82,23 +86,33 @@ namespace vsslam {
       if (frame_track_init->isCamCalibrated() && frame_track_current->isCamCalibrated())
       {
         // Estimate essential / homography matrix
+        if (verbose_level > 1)
+        {
+          std::cout << "Tracker: [Initialization] Estimate relative pose: " << frame_track_init->getFrameId() << " :: " << frame_track_current->getFrameId() << "\n";
+
+        }
         b_estimated_motion = PoseEstimator::estimateRobustRelativePose_HE_Pinhole(frame_track_init.get(), frame_track_current.get(), vec_putative_matches_ref_cur_idx, T, vec_inliers_M, f_model_thesh,params_.get());
       }
       else
       {
         // Estimate fundamental / homography matrix
-        std::cout<<"Tracker: [Initialization] No support for HF initializaton ("<<"-1"<<" s)\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] No support for HF initializaton ("<<"-1"<<" s)\n";
         b_estimated_motion = false;
       }
 
       if(!b_estimated_motion)
       {
-        std::cout<<"Tracker: [Initialization] Motion estimation failed! Try with next frame\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] Motion estimation failed! Try with next frame\n";
         return false;
       }
 
-      std::cout<<"Tracker: [Initialization] Motion estimation OK: #inliers: "<<vec_inliers_M.size()<<"( "<< time_data.d_pose_init<<" s)\n";
-      std::cout<<"Tracker: [Initialization] T\n:"<<T<<"\n";
+      if (verbose_level > 1)
+      {
+        std::cout<<"Tracker: [Initialization] Motion estimation OK: #inliers: "<<vec_inliers_M.size()<<"( "<< time_data.d_pose_init<<" s)\n";
+        std::cout<<"Tracker: [Initialization] T:\n"<<T<<"\n";
+      }
 
       // Save for display
       if (display_data.b_enable_display)
@@ -121,7 +135,8 @@ namespace vsslam {
       frame_track_init->setPose_T_withReferenceFrame(Mat4::Identity(),nullptr);
       frame_track_current->setPose_T_withReferenceFrame(T,nullptr);
 
-      std::cout<<"Tracker: [Initialization] Initial poses set. \n";
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] Initial poses set. \n";
 
       // -------------------
       // -- Triangulate inliers
@@ -137,9 +152,9 @@ namespace vsslam {
 
       // Iterate through inliers and triangulate new landmarks
       NewMapLandmarks vec_new_map_landmarks(vec_inliers_M.size());
-      #ifdef OPENMVG_USE_OPENMP
+      /*#ifdef OPENMVG_USE_OPENMP
       #pragma omp parallel for schedule(dynamic)
-      #endif
+      #endif*/
       for ( size_t k_i = 0; k_i < vec_inliers_M.size(); ++k_i)
       {
         // Advance to the correct inlier
@@ -171,7 +186,8 @@ namespace vsslam {
         // Mark as point used in the motion initialization
         map_landmark->association_type_ = 1;
       }
-      std::cout<<"Tracker: [Initialization] Triangulation OK. \n";
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] Triangulation OK. \n";
 
       // Save for display
       if (display_data.b_enable_display)
@@ -183,20 +199,36 @@ namespace vsslam {
       // -------------------
       // -- Optimize initial poses
       // -------------------
-      std::cout<<"Tracker: [Initialization] Initial triangulated points before: "<<vec_new_map_landmarks.size()<<"\n";
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] Initial triangulated points before: "<<vec_new_map_landmarks.size()<<"\n";
 
       // Set first frame as fixed
       frame_track_init->setActive();
+
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization preBA] # of tracked points before clearning: "<<vec_new_map_landmarks.size() << "\n";
+      
+      removeOutliersInCandidateLandmarks(frame_track_current.get(),vec_new_map_landmarks);
+      
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization preBA] # of tracked points after clearning: "<<vec_new_map_landmarks.size() << "\n";
 
       // Optimize first pair
       bool b_use_robust_function = true;
       if (!cartographer_->optimizeLocalMap(frame_track_current.get(), vec_new_map_landmarks,b_use_robust_function))
       {
-        std::cout<<"Tracker: [Initialization] Optimize local FAILED\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] Optimize local FAILED\n";
         return false;
       }
 
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] # of tracked points before clearning: "<<vec_new_map_landmarks.size() << "\n";
+      
       removeOutliersInCandidateLandmarks(frame_track_current.get(),vec_new_map_landmarks);
+    
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] # of tracked points after clearning: "<<vec_new_map_landmarks.size() << "\n";
 
       // Save for display
       if (display_data.b_enable_display)
@@ -209,7 +241,8 @@ namespace vsslam {
       // -------------------
       if (vec_new_map_landmarks.size() < params_->init_track_min_matches)
       {
-        std::cout<<"Tracker: [Initialization] Insufficient # of tracked points: "<<vec_new_map_landmarks.size()<<"! Setting this frame as new initialization reference frame\n";
+        if (verbose_level > 1)
+          std::cout<<"Tracker: [Initialization] Insufficient # of tracked points: "<<vec_new_map_landmarks.size()<<"! Setting this frame as new initialization reference frame\n";
         startInitialization();
         return false;
       }
@@ -235,7 +268,8 @@ namespace vsslam {
 
 
       // Set tracking to OK
-      std::cout<<"Tracker: [Initialization] Set system status to OK\n";
+      if (verbose_level > 1)
+        std::cout<<"Tracker: [Initialization] Set system status to OK\n";
       tracking_status_ = TRACKING_STATUS::OK;
       return true;
     }
@@ -246,15 +280,20 @@ namespace vsslam {
   {
     // Clear all initialization settings
     clearInitializationData();
+
     // Set current frame as the new reference frame for initialization
-    std::cout<<"Tracker: [Initialization] Set system initialization reference frame\n";
+    if (verbose_level > 1)
+      std::cout<<"Tracker: [Initialization] Set system initialization reference frame\n";
+
     frame_track_init = frame_track_current->share_ptr();
     // Set system status to INIT
     tracking_status_ = TRACKING_STATUS::INIT;
   }
   void Tracker_Features::resetInitialization()
   {
-    std::cout<<"Tracker: [Initialization] Reset system initialization process!\n";
+    if (verbose_level > 1)
+      std::cout<<"Tracker: [Initialization] Reset system initialization process!\n";
+
     clearInitializationData();
     motion_model_.setInvalid();
     tracking_status_ = TRACKING_STATUS::NOT_INIT;
@@ -262,7 +301,9 @@ namespace vsslam {
   }
   void Tracker_Features::clearInitializationData()
   {
-    std::cout << "Tracker: [Initialization] Clear tracking initialization data!\n";
+    if (verbose_level > 1)
+      std::cout << "Tracker: [Initialization] Clear tracking initialization data!\n";
+
     if (frame_track_init) {
       frame_track_init.reset();
     }

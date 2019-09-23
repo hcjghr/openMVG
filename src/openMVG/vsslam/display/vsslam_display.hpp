@@ -30,6 +30,8 @@ namespace vsslam {
 
 struct VSSLAM_Display
 {
+  int verbose_level = 0;
+
   bool b_enable_display = false;
 
   std::vector<size_t> display_iter;
@@ -42,6 +44,10 @@ struct VSSLAM_Display
   std::vector<std::vector<float> > display_size_C;
 
   size_t n_steps_in_bundle = 0;
+
+  std::vector<MapLandmark *> display_local_map;
+
+
 
 
   void DrawCircle(float cx, float cy, float r)
@@ -286,13 +292,14 @@ struct VSSLAM_Display
       Vec2 pt = frame->getFeaturePosition(feat_i);
       glVertex2f(pt(0),pt(1));
     }
-    glEnd();
+    glEnd();  
   }
 
 
   void displayFrameActivityIndicator(CGlWindow & window, Frame * frame)
   {
-    std::cout<<"Activity frame: "<<frame->getFrameId()<<":: "<<frame->isActive()<<"\n";
+    if (verbose_level>1)
+      std::cout<<"Activity frame: "<<frame->getFrameId()<<":: Global: "<<frame->isActive()<<"\n";
 
     // Green circle if active and red if inactive
     if (frame->isActive())
@@ -301,22 +308,21 @@ struct VSSLAM_Display
     }
     else
     {
-      glColor3f(1.0,0.0,0.0);
+      glColor3f(0.0,0.0,1.0);
     }
 
     // Draw point
+    glPointSize(25.0f);
     glBegin(GL_POINTS);
-    glPointSize(20.0f);
-    glVertex2f(window._width-30,30);
-    std::cout<<"WW: "<<window._width<<" :: "<<window._height<<"\n";
+    glVertex2f(50,50);
     glEnd();
   }
 
 
-  void displayByAssociation(Frame * frame)
+  void displayFeaturesByAssociation(Frame * frame)
   {
     glPointSize(4.0f);
-    std::cout<<"Association tracks: "<<frame->getFrameId()<<":: "<<frame->isActive()<<"\n";
+    glBegin(GL_POINTS);
     for (IndexT feat_i = 0; feat_i<frame->getNumberOfFeatures(); ++feat_i)
     {
       MapLandmark * map_landmark = frame->getLandmark(feat_i);
@@ -352,16 +358,16 @@ struct VSSLAM_Display
       }
       // Draw point
       glColor3f(pt_color(0),pt_color(1),pt_color(2));
-      glBegin(GL_POINTS);
       Vec2 pt = frame->getFeaturePosition(feat_i);
       glVertex2f(pt(0),pt(1));
-      glEnd();
     }
+    glEnd();
   }
 
   void displayHistoryTracks(Frame * frame)
   {
-    std::cout<<"History tracks: "<<frame->getFrameId()<<":: "<<frame->isActive()<<"\n";
+    if (verbose_level>1)
+      std::cout<<"History tracks: "<<frame->getFrameId()<<":: "<<frame->isActive()<<"\n";
     
     for (IndexT feat_i = 0; feat_i<frame->getNumberOfFeatures(); ++feat_i)
     {
@@ -369,38 +375,48 @@ struct VSSLAM_Display
       if (!map_landmark)
         continue;
 
+      // Plot historical line of the landmark
       glPointSize(2.0f);
       glColor3f(1.f, 0.f, 0.f);
       glBegin(GL_LINE_STRIP);
 
       for (auto & obs_it : map_landmark->getObservations())
       {
-
-//        if (obs_it.second.frame_ptr)
-//        {
           Vec2 pt = obs_it.second.frame_ptr->getFeaturePosition(obs_it.second.feat_id);
           glVertex2f(pt(0),pt(1));
-//          }
       }
-      glEnd();
-
-      glPointSize(4.0f);
-
-      // check if frame is in global frame
-      if (frame->isActive()){
-        glColor3f(0.f, 1.f, 0.f);
-      }
-      else{
-        glColor3f(1.f, 1.f, 0.f);
-      }
-      glBegin(GL_POINTS);
-
+      
+      // Link to current point
+      glColor3f(1.f, 1.f, 0.f);
       Vec2 pt = frame->getFeaturePosition(feat_i);
       glVertex2f(pt(0),pt(1));
+
       glEnd();
     }
   }
 
+  void displayLocalMap(Frame * frame)
+  {
+    glPointSize(3.0f);
+    glBegin(GL_POINTS);
+    glColor3f(0.f, 0.f, 1.f);
+    for (IndexT feat_i = 0; feat_i<display_local_map.size(); ++feat_i)
+    {
+      // Get Landmark data
+      MapLandmark * map_landmark = display_local_map[feat_i];
+      if (!map_landmark)
+        continue;
+
+      // Project point to frame coordinate system
+      Vec2 pt_2D_frame;
+      if (frame->getProjectedPoint(map_landmark,pt_2D_frame))
+      {
+        glVertex2f(pt_2D_frame(0),pt_2D_frame(1));
+      }
+    }
+    glEnd();
+  }
+  
   void displaySteps(CGlWindow & window, GLuint & text2D,
       image::Image<unsigned char> &currentImage, Frame * frame, unsigned int sleep_time = 3)
   {
@@ -408,6 +424,7 @@ struct VSSLAM_Display
     Vec2 ptA ,ptB,ptC = Vec2(-1,-1);
     float ptSA,ptSB,ptSC = -1;
     size_t max_steps = std::max<size_t>(display_pt2d_A.size(),std::max<size_t>(display_pt2d_B.size(),display_pt2d_C.size()));
+    
     for (size_t step_i = 0; step_i < max_steps; step_i++)
     {
       std::cout<<display_text[step_i]<<"\n";
@@ -519,17 +536,7 @@ struct VSSLAM_Display
           glEnd();
         }
       }
-
-      glFlush();
-      window.Swap(); // Swap openGL buffer
-
-      // Wait
-      //sleep(sleep_time);
-      std::cout<<"Press ENTER to continue....."<<std::endl<<std::endl;
-      //std::cin.ignore(1);
     }
-
-
   }
 #endif // !SWINE_NOGL
 

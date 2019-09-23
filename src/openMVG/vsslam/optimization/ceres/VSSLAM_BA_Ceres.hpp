@@ -39,8 +39,8 @@ ceres::CostFunction * IntrinsicsToCostFunction
   IntrinsicBase * intrinsic,
   const Vec2 & observation,
   const Eigen::Matrix<double, 2, 2> & inf_matrix,
-  const double weight = 0.0,
-  const bool b_sim3 = false
+  const bool b_sim3 = false,
+  const double weight = 0.0
 );
 
 class VSSLAM_BA_Ceres : public VSSLAM_BA
@@ -135,7 +135,8 @@ public:
     Frame * frame_i,
     NewMapLandmarks & vec_new_landmarks,
     bool b_use_loss_function,
-    BA_options_Ceres & ba_options
+    BA_options_Ceres & ba_options,
+    int verbose_level
   );
 
   static bool OptimizePose
@@ -143,14 +144,18 @@ public:
     Frame * frame,
     Hash_Map<MapLandmark *,IndexT> & matches_map_cur_idx,
     bool b_use_loss_function,
-    BA_options_Ceres & ba_options
+    BA_options_Ceres & ba_options,
+    int verbose_level
   );
 
   bool addObservationToGlobalSystem(MapLandmark * map_point, MapObservation * map_observation)override;
   bool addLandmarkToGlobalSysyem(MapLandmark * map_point)override;
   bool addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed = false)override;
-  bool optimizeGlobal(VSSLAM_Map & map_global)override;
+  bool optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats * stats = nullptr)override;
 
+
+  bool exportStateSE3(std::string filepath)override;
+  bool exportDiagonalMarginals(std::string filepath)override;
 
 };
 

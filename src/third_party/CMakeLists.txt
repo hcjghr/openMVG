@@ -34,7 +34,7 @@ endif()
 ##
 # Image I/O
 ##
-if(NOT JPEG_FOUND)
+#if(NOT JPEG_FOUND)
   set(OpenMVG_USE_INTERNAL_JPEG ON PARENT_SCOPE)
   set(JPEG_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/openMVG/third_party/jpeg)
   add_subdirectory(jpeg)
@@ -42,15 +42,15 @@ if(NOT JPEG_FOUND)
   set(JPEG_INCLUDE_DIR ${JPEG_INCLUDE_DIRECTORIES})
   set(JPEG_LIBRARIES jpeg PARENT_SCOPE)
   set(JPEG_INCLUDE_DIR ${JPEG_INCLUDE_DIR} PARENT_SCOPE)
-endif(NOT JPEG_FOUND)
+#endif(NOT JPEG_FOUND)
 
 # TIFF and PNG depend on zlib, if one of them is not found add the internal zlib
-if(NOT PNG_FOUND OR NOT TIFF_FOUND)
+#if(NOT PNG_FOUND OR NOT TIFF_FOUND)
   set(ZLIB_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/openMVG/third_party/zlib)
   add_subdirectory(zlib)
-endif(NOT PNG_FOUND OR NOT TIFF_FOUND)
+#endif(NOT PNG_FOUND OR NOT TIFF_FOUND)
 
-if (NOT PNG_FOUND)
+#if (NOT PNG_FOUND)
   set(OpenMVG_USE_INTERNAL_PNG ON PARENT_SCOPE)
   set(PNG_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/openMVG/third_party/png)
   add_subdirectory(png)
@@ -59,9 +59,9 @@ if (NOT PNG_FOUND)
   set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRECTORIES})
   set(PNG_LIBRARIES ${PNG_LIBRARIES} PARENT_SCOPE)
   set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS} PARENT_SCOPE)
-endif (NOT PNG_FOUND)
+#endif (NOT PNG_FOUND)
 
-if (NOT TIFF_FOUND)
+#if (NOT TIFF_FOUND)
   set(OpenMVG_USE_INTERNAL_TIFF ON PARENT_SCOPE)
   set(TIFF_INCLUDE_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/include/openMVG/third_party/tiff)
   add_subdirectory(tiff)
@@ -70,7 +70,7 @@ if (NOT TIFF_FOUND)
   set(TIFF_LIBRARIES tiff)
   set(TIFF_LIBRARIES ${TIFF_LIBRARIES} PARENT_SCOPE)
   set(TIFF_INCLUDE_DIR ${TIFF_INCLUDE_DIR} PARENT_SCOPE)
-endif (NOT TIFF_FOUND)
+#endif (NOT TIFF_FOUND)
 ##
 # End - Image I/O
 ##

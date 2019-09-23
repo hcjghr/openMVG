@@ -87,14 +87,30 @@ struct VSSLAM_Parameters : public std::enable_shared_from_this<VSSLAM_Parameters
   size_t map_min_init_pts = 30;
   size_t map_min_obs_per_frame = 10;
 
+// ---------------
+  // New Keyframe
+  // ---------------
+  size_t n_max_frames_not_tracked = 100;  // Max number of frames between two tracked frames
+  size_t n_min_global_landmarks_tracked = 50; // Min number of global landmarks needed to be tracked (otherwise new frame)
+  size_t n_min_global_landmarks_to_check_prev_stats = 100;  // Min number of global landmarks to be confident (otherwise check stats of prev frame)
+  float f_min_ratio_of_landmarks_tracked_reference_frame = 0.6; // Min number of landmark tracked compared to prev frame (otherwise new frame)
+  float f_max_ratio_of_landmarks_tracked_prev_frame = 1.4;  // If more than ratio of landmarks tracked add frame
 
+
+
+  // ---------------
+  // Output parameters
+  // ---------------
+  std::string s_output_folder = "";
   bool b_export_intermediate_scene_ply = true;
-  bool b_export_graph_file = true;
-  std::string s_graph_file_path = "/home/klemen/SlamPP_graph_file.txt";
-
   bool b_export_stats_file = true;
-  std::string s_stats_file_path = "/home/klemen/stats.csv";
+  bool b_export_graph_file = true;
 
+  std::string s_graph_file_path = "SlamPP_graph_file.txt";
+  std::string s_stats_file_path = "VSSLAM_stats.csv";
+
+
+  int verbose_level = 0;
 };
 
 

@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <string>
 #include "openMVG/types.hpp"
 #include <openMVG/vsslam/vsslam_parameters.hpp>
 #include <openMVG/vsslam/vsslam_data.hpp>
@@ -27,6 +28,8 @@ namespace vsslam {
 class Abstract_Tracker
 {
 protected:
+  int verbose_level = 0;  // 0 - none; 1 - stats; 2 - all
+
   /// Parameters Object
   std::shared_ptr<VSSLAM_Parameters> params_;
   /// Tracking status
@@ -49,6 +52,14 @@ public:
 
   virtual bool isReady() = 0;
 
+  virtual void printKeyFrameReason( size_t & keyframe_reason)=0;
+  
+  void setVerboseLevel(int level)
+  {
+    verbose_level = level;
+    std::cout<<"Tracker: Verbose level: " << verbose_level << "\n";
+  }
+  
   void setCartographer(Cartographer * cartographer)
   {
     cartographer_ = cartographer;

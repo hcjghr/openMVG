@@ -52,31 +52,43 @@ int main(int argc, char **argv)
   CmdLine cmd;
 
   std::string sImaDirectory = "";
+  std::string sOutDir = "";
   std::string sImaMask = "";
   unsigned int uTracker = 0;
+
+  int verbose_level = 0;  // 0 - none; 1 - stats; 2 - all
+  bool b_prompt_wait = false;
 
   // Camera data
   std::string sKmatrix;
   int i_User_camera_model = PINHOLE_CAMERA_RADIAL3;
 
   cmd.add( make_option('i', sImaDirectory, "imadir") );
+  cmd.add( make_option('o', sOutDir, "out_dir") );
   cmd.add( make_option('m', sImaMask, "imamask") );
   cmd.add( make_option('t', uTracker, "tracker") );
   cmd.add( make_option('k', sKmatrix, "intrinsics") );
   cmd.add( make_option('c', i_User_camera_model, "camera_model") );
+  cmd.add( make_option('v', verbose_level, "verbose_level") );
+  cmd.add( make_switch('w', "prompt_wait") );
 
   try {
     if (argc == 1) throw std::string("Invalid command line parameter.");
     cmd.process(argc, argv);
   } catch(const std::string& s) {
     std::cerr << "Usage: " << argv[0] << '\n'
-    << "[-i|--imadir path] \n"
+    << "[-i|--imadir image path] \n"
+    << "[-o|--out_dir output path] \n"
     << "[-m|--mask image] \n"
     << "[-t|--tracker Used tracking interface] \n"
     << "\t 0 (default) description based Tracking -> Fast detector + Dipole descriptor\n"
 #if defined HAVE_OPENCV
     << "\t 1 image based Tracking -> use OpenCV Pyramidal KLT Tracking\n"
 #endif
+    << "-v|--verbose_level] \n"
+    << "\t 0: None (default)\n"
+    << "\t 1: Stats\n"
+    << "\t 2: All\n"
     << "[-k|--intrinsics] Kmatrix: \"f;0;ppx;0;f;ppy;0;0;1\"\n"
     << "[-c|--camera_model] Camera model type:\n"
     << "\t 1: Pinhole\n"
@@ -84,6 +96,7 @@ int main(int argc, char **argv)
     << "\t 3: Pinhole radial 3 (default)\n"
     << "\t 4: Pinhole brown 2\n"
     << "\t 5: Pinhole with a simple Fish-eye distortion\n"
+    << "[-w|--prompt_wait] wait for key after frame\n"
     << std::endl;
 
     std::cerr << s << std::endl;
@@ -99,10 +112,11 @@ int main(int argc, char **argv)
 
   if (sImaDirectory.empty() || !stlplus::is_folder(sImaDirectory))
   {
-    std::cerr << "\nIt is an invalid input directory" << std::endl;
+    std::cerr << "\nVSSLAM: [Main] Invalid input directory" << std::endl;
     return EXIT_FAILURE;
   }
 
+  b_prompt_wait = (cmd.used('w')?true:false);
 
   // ----------------------------------
   // Image management
@@ -133,10 +147,26 @@ int main(int argc, char **argv)
   // ----------------------------------
   // SLAM system initialization
   // ----------------------------------
-  std::cout<<"\nVSSLAM: [Start]\n";
-  std::shared_ptr<VSSLAM_Parameters> params_system = std::make_shared<VSSLAM_Parameters>();
+  std::cout<<"\nVSSLAM: [Main] Start\n";
 
+  // initialize params
+  std::shared_ptr<VSSLAM_Parameters> params_system = std::make_shared<VSSLAM_Parameters>();
   SLAM_System slam_system(params_system);
+
+  // Output settings
+  if (sOutDir.empty() || !stlplus::is_folder(sOutDir))
+  {
+    slam_system.disableOutput();
+  }
+  else
+  {
+    slam_system.setOutputDirectory(sOutDir);
+    slam_system.setIntermediateResultOutput(true);
+  }
+
+  slam_system.prepareStatsFile();
+
+
 
   // Create cartographer
   MAP_FRAME_TYPE map_frame_type = MAP_FRAME_TYPE::GLOBAL;
@@ -144,8 +174,6 @@ int main(int argc, char **argv)
 
   MAP_OPTIMIZATION_TYPE global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
   MAP_OPTIMIZATION_TYPE local_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
-
-
 
   {
     std::unique_ptr<Abstract_Tracker> ptr_tracker;
@@ -157,8 +185,8 @@ int main(int argc, char **argv)
       case 0:
         ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, features::HIGH_PRESET));
         ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
-        global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
-        //global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
+        //global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
+        global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
         display_data.b_enable_display = 0;
 
         break;
@@ -166,27 +194,27 @@ int main(int argc, char **argv)
         ptr_feat_extractor.reset(new Feat_Extractor_AKAZE_MSURF(params_system, features::NORMAL_PRESET));
         //ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, features::HIGH_PRESET));
         ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
-        global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
+        //global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
+        global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
         display_data.b_enable_display = 0;
         //ptr_feat_matcher.reset(new Feat_Matcher_Regions(params_system, ptr_feat_extractor.get()));
-
         break;
       default:
-        std::cerr << "Unknow tracking method" << std::endl;
+        std::cerr << "VSSLAM: [Main] Unknow tracking method" << std::endl;
         return EXIT_FAILURE;
     }
 
+
     if (!slam_system.createCartographer(map_frame_type,map_landmark_type,global_BA_type,local_BA_type ))
     {
-      std::cerr << "Cannot instantiate the cartographer" << std::endl;
+      std::cerr << "VSSLAM: [Main] Cannot instantiate the cartographer" << std::endl;
       return EXIT_FAILURE;
     }
-
 
     ptr_tracker.reset(new Tracker_Features(params_system));
     if (!ptr_tracker)
     {
-      std::cerr << "Cannot instantiate the tracking interface" << std::endl;
+      std::cerr << "VSSLAM: [Main] Cannot instantiate the tracking interface" << std::endl;
       return EXIT_FAILURE;
     }
 
@@ -194,6 +222,8 @@ int main(int argc, char **argv)
     slam_system.setFeatureMatcher(ptr_feat_matcher);
     slam_system.setTracker(ptr_tracker);
 
+    // Set verbose level
+    slam_system.setVerboseLevel(verbose_level);
 
   }
 
@@ -211,16 +241,23 @@ int main(int argc, char **argv)
     if (sKmatrix.empty() ||
       !CameraParameters::checkIntrinsicStringValidity(sKmatrix, params_cam_0.focal, params_cam_0.ppx, params_cam_0.ppy) )
     {
-      std::cerr << "\nInvalid K matrix input" << std::endl;
+      std::cerr << "\nVSSLAM: [Main] Error: Invalid K matrix input" << std::endl;
       return EXIT_FAILURE;
     }
+
     if (!params_cam_0.readImageSettings(stlplus::create_filespec( sImaDirectory, vec_image[0] )))
     {
-      std::cerr << "\nError reading image header file" << std::endl;
+      std::cerr << "\nVSSLAM: [Main] Error: reading image header file" << std::endl;
       return EXIT_FAILURE;
     }
 
     // Create camera model
+    if (params_cam_0.camera_model!=EINTRINSIC::PINHOLE_CAMERA)
+    {
+      std::cerr << "VSSLAM: [Main] Error: Camera type: " << params_cam_0.camera_model << " NOT implemented" << std::endl;
+      return EXIT_FAILURE;
+    }
+
     if (params_cam_0.isValid())
     {
       params_cam_0.b_calibrated = true;
@@ -228,9 +265,11 @@ int main(int argc, char **argv)
     }
     else
     {
-      std::cerr << "Error: invalid camera parameters"<< std::endl;
+      std::cerr << "VSSLAM: [Main] Error: invalid camera parameters"<< std::endl;
       return EXIT_FAILURE;
     }
+
+    
   }
   // ----------------------------------
   // Load mask images
@@ -240,25 +279,26 @@ int main(int argc, char **argv)
     if (!sImaMask.empty() && stlplus::file_exists(sImaMask))
     {
       if (image::GetFormat(sImaMask.c_str()) == image::Unknown)
-        std::cout << "\nMask image path is invalid! Not using mask image!" << std::endl;
+        std::cout << "VSSLAM: [Main] Mask image path is invalid! Not using mask image" << std::endl;
       else
       {
         if (!(image::ReadImage( sImaMask.c_str(), &mask_cam_0)))
         {
-          std::cout << "\nMask image is invalid! Not using mask image!" << std::endl;
+          std::cout << "VSSLAM: [Main] Mask image is invalid! Not using mask image" << std::endl;
         }
         else
         {
-          std::cout << "\nUsing mask image: "<<sImaMask<<"!\n" << std::endl;
           slam_system.addMaskImageToCamera(id_cam_0,mask_cam_0);
+          std::cout << "VSSLAM: [Main] Camera: " << id_cam_0 << " using mask image: "<<sImaMask<<"\n" << std::endl;
         }
       }
     }
   }
+  slam_system.printCameraParameters(id_cam_0);
 
   if(!slam_system.isReady())
   {
-    std::cerr << "VSSLAM: SLAM not correctly initialized\n";
+    std::cerr << "VSSLAM: [Main] Error: SLAM not correctly initialized\n";
     return EXIT_FAILURE;
   }
 
@@ -276,6 +316,9 @@ int main(int argc, char **argv)
   GLuint text2D;
 #endif // !SWINE_NOGL
 
+
+
+
   // ----------------------------------
   // Frame-by-Frame processing
   // ----------------------------------
@@ -292,7 +335,7 @@ int main(int argc, char **argv)
     {
       slam_system.nextFrame(currentImage, id_frame, id_cam,timestamp_frame);
 
-
+     
 #ifndef SWINE_NOGL
       if (window._height < 0)
       {
@@ -318,24 +361,35 @@ int main(int argc, char **argv)
       }
       else
       {
+        // Set title
+        std::stringstream ss;
+        ss << "Frame: " << " " << slam_system.getCurrentFramePtr()->getFrameId();
+        window.setTitle(ss.str());
+
         display_data.displayImage(window,text2D, currentImage);
-        std::cout<<"A\n";
+        // Detected features yellow
         display_data.displayDetectedFeatures(slam_system.getCurrentFramePtr());
-std::cout<<"B\n";    
-if (slam_system.isMapInitialized())    
-  display_data.displayHistoryTracks(slam_system.getCurrentFramePtr());
-std::cout<<"C\n";        
-display_data.displayByAssociation(slam_system.getCurrentFramePtr());
-std::cout<<"D\n";        
-display_data.displayFrameActivityIndicator(window,slam_system.getCurrentFramePtr());
-std::cout<<"E\n";        
+
+        display_data.displayLocalMap(slam_system.getCurrentFramePtr());
+
+        if (slam_system.isMapInitialized())    
+          display_data.displayHistoryTracks(slam_system.getCurrentFramePtr());
+
+        display_data.displayFeaturesByAssociation(slam_system.getCurrentFramePtr());
+        display_data.displayFrameActivityIndicator(window,slam_system.getCurrentFramePtr());
+
       }
 
+      glFinish();
       glFlush();
       window.Swap(); // Swap openGL buffer
 #endif // !SWINE_NOGL
-      std::cout<<"Press ENTER to continue....."<<std::endl<<std::endl;
-      //std::cin.ignore(1);
+
+      if (b_prompt_wait)
+      {
+        std::cout<<"VSSLAM: [Main] Press ENTER to continue....."<<std::endl<<std::endl;
+        std::cin.ignore(1);
+      }
     }
   }
 

@@ -22,20 +22,23 @@ ceres::CostFunction * IntrinsicsToCostFunction
   IntrinsicBase * intrinsic,
   const Vec2 & observation,
   const Eigen::Matrix<double, 2, 2> & inf_matrix,
-  const double weight,
-  const bool b_sim3
+  const bool b_sim3,
+  const double weight
 )
 {
-
   switch(intrinsic->getType())
   {
     case PINHOLE_CAMERA:
       //return ResidualErrorFunctor_Pinhole_Intrinsic_Rts::Create(observation, weight);
       //return ResidualErrorFunctor_Pinhole_Intrinsic_Rts::Create(observation, inf_matrix, weight);
       if (b_sim3)
+      {
         return Chi2ErrorFunctor_Pinhole_Intrinsic_Rts::Create(observation, inf_matrix, weight);
+      }
       else
+      {
         return Chi2ErrorFunctor_Pinhole_Intrinsic_Rt::Create(observation, inf_matrix, weight);
+      }
      break;
     default:
       return nullptr;
@@ -82,7 +85,8 @@ bool VSSLAM_BA_Ceres::OptimizeLocalSystem
   Frame * frame_i,
   NewMapLandmarks & vec_new_landmarks,
   bool b_use_loss_function,
-  BA_options_Ceres & ba_options
+  BA_options_Ceres & ba_options,
+  int verbose_level
 )
 {
   if (!frame_i)
@@ -90,7 +94,11 @@ bool VSSLAM_BA_Ceres::OptimizeLocalSystem
     return true;
   }
 
-  std::cout<<"VSSLAM: [BA - Ceres] Optimize local map\n";
+  if (verbose_level>1)
+  {
+    std::cout<<"Cartographer: [Local][BA - Ceres] Optimize local map\n";
+    std::cout<<"Cartographer: [Local][BA - Ceres] Use sim3: " << ba_options.b_use_sim3_local << "\n";
+  }
 
   ceres::Problem problem;
 
@@ -120,6 +128,7 @@ bool VSSLAM_BA_Ceres::OptimizeLocalSystem
 
   // Get pose in the WORLD reference frame
   frame_i->getPose_sRt_Inverse(R,t,s,nullptr);
+
   // Convert rotation matrix to angleaxis representation
   ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
   // Save data about the poses
@@ -154,6 +163,7 @@ bool VSSLAM_BA_Ceres::OptimizeLocalSystem
           frame_i->getFeaturePosition(mp_i),
           frame_i->getFeatureSqrtInfMatrix(mp_i),
           ba_options.b_use_sim3_local);
+
 
       // Add cost term
       if (cost_function)
@@ -306,25 +316,31 @@ bool VSSLAM_BA_Ceres::OptimizeLocalSystem
   // If no error, get back refined parameters
   if (!summary.IsSolutionUsable())
   {
-    if (ba_options.b_verbose_)
-      std::cout << "Bundle Adjustment failed." << std::endl;
+    if (verbose_level>1)
+    {
+      if (ba_options.b_verbose_)
+        std::cout << "Bundle Adjustment failed." << std::endl;
+    }
     return false;
   }
   else // Solution is usable
   {
-    if (ba_options.b_verbose_)
+    if (verbose_level>1)
     {
-      // Display statistics about the minimization
-      std::cout << std::endl
-        << "Bundle Adjustment statistics (approximated RMSE):\n"
-        << " #keyframes: " << map_poses.size() << "\n"
-        << " #intrinsics: " << map_intrinsics.size() << "\n"
-        //<< " #points: " << slam_data.structure.size() << "\n"
-        << " #residuals: " << summary.num_residuals << "\n"
-        << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
-        << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
-        << " Time (s): " << summary.total_time_in_seconds << "\n"
-        << std::endl;
+      if (ba_options.b_verbose_)
+      {
+        // Display statistics about the minimization
+        std::cout << std::endl
+          << "Bundle Adjustment statistics (approximated RMSE):\n"
+          << " #keyframes: " << map_poses.size() << "\n"
+          << " #intrinsics: " << map_intrinsics.size() << "\n"
+          //<< " #points: " << slam_data.structure.size() << "\n"
+          << " #residuals: " << summary.num_residuals << "\n"
+          << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
+          << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
+          << " Time (s): " << summary.total_time_in_seconds << "\n"
+          << std::endl;
+      }
     }
 
     // Update camera poses with refined data
@@ -348,7 +364,8 @@ bool VSSLAM_BA_Ceres::OptimizePose
   Frame * frame,
   Hash_Map<MapLandmark *,IndexT> & matches_map_cur_idx,
   bool b_use_loss_function,
-  BA_options_Ceres & ba_options
+  BA_options_Ceres & ba_options,
+  int verbose_level
 )
 {
   if (!frame || matches_map_cur_idx.empty())
@@ -356,7 +373,8 @@ bool VSSLAM_BA_Ceres::OptimizePose
     return true;
   }
 
-  std::cout<<"VSSLAM: [BA - Ceres] Optimize pose\n";
+  if (verbose_level>1)
+    std::cout<<"Cartographer: [Local][BA - Ceres] Optimize pose\n";
 
   // Create the local problem
   ceres::Problem problem;
@@ -413,6 +431,8 @@ bool VSSLAM_BA_Ceres::OptimizePose
       continue;
     // Add measurement in frame_i to landmark
     // Create the cost function for the measurement
+
+    // TODO: Check IntrinsicsToCostFunction
     ceres::CostFunction* cost_function = IntrinsicsToCostFunction(cam_intrinsic,
         frame->getFeaturePosition(mp_i),
         frame->getFeatureSqrtInfMatrix(mp_i),
@@ -445,9 +465,11 @@ bool VSSLAM_BA_Ceres::OptimizePose
     // Each Residual block takes a point and a camera as input and outputs a 2
     // dimensional residual. Internally, the cost function stores the observed
     // image location and compares the reprojection against the observation.
+    
     ceres::CostFunction* cost_function = IntrinsicsToCostFunction(cam_intrinsic,
                                                                   frame->getFeaturePosition(match.second),
-                                                                  frame->getFeatureSqrtInfMatrix(match.second),ba_options.b_use_sim3_local);
+                                                                  frame->getFeatureSqrtInfMatrix(match.second),
+                                                                  ba_options.b_use_sim3_local);
 
     if (cost_function)
     {
@@ -483,25 +505,31 @@ bool VSSLAM_BA_Ceres::OptimizePose
   // If no error, get back refined parameters
   if (!summary.IsSolutionUsable())
   {
-    if (ba_options.b_verbose_)
-      std::cout << "Bundle Adjustment failed." << std::endl;
+    if (verbose_level>1)
+    {
+      if (ba_options.b_verbose_)
+        std::cout << "Bundle Adjustment failed." << std::endl;
+    }
     return false;
   }
   else // Solution is usable
   {
-    if (ba_options.b_verbose_)
+    if (verbose_level>1)
     {
-      // Display statistics about the minimization
-      std::cout << std::endl
-        << "Bundle Adjustment statistics (approximated RMSE):\n"
-        << " #keyframes: " << map_poses.size() << "\n"
-        << " #intrinsics: " << map_intrinsics.size() << "\n"
-        //<< " #points: " << slam_data.structure.size() << "\n"
-        << " #residuals: " << summary.num_residuals << "\n"
-        << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
-        << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
-        << " Time (s): " << summary.total_time_in_seconds << "\n"
-        << std::endl;
+      if (ba_options.b_verbose_)
+      {
+        // Display statistics about the minimization
+        std::cout << std::endl
+          << "Bundle Adjustment statistics (approximated RMSE):\n"
+          << " #keyframes: " << map_poses.size() << "\n"
+          << " #intrinsics: " << map_intrinsics.size() << "\n"
+          //<< " #points: " << slam_data.structure.size() << "\n"
+          << " #residuals: " << summary.num_residuals << "\n"
+          << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
+          << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
+          << " Time (s): " << summary.total_time_in_seconds << "\n"
+          << std::endl;
+      }
     }
 
     // Update camera poses with refined data
@@ -534,7 +562,8 @@ bool VSSLAM_BA_Ceres::addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed)
 
   if (map_poses_.find(frame_id)!=map_poses_.end())
   {
-    std::cout<<"Cartographer: [Ceres GlobalBA] Frame "<<frame->getFrameId()<< "already in the system!";
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Ceres] Frame "<<frame->getFrameId()<< "already in the global system!";
     return false;
   }
 
@@ -595,7 +624,8 @@ bool VSSLAM_BA_Ceres::addFrameToGlobalSystem(Frame * frame, bool b_frame_fixed)
   }
 
 
-  std::cout<<"Cartographer: [Ceres GlobalBA] Add frame: "<<frame->getFrameId()<< " Fixed: "<<b_frame_fixed<<" to global map!\n";
+  if (verbose_level>1)
+    std::cout<<"Cartographer: [Global][BA - Ceres] Add frame: "<<frame->getFrameId()<< " Fixed: "<<b_frame_fixed<<" to global map!\n";
   return true;
 }
 
@@ -636,7 +666,8 @@ bool VSSLAM_BA_Ceres::addLandmarkToGlobalSysyem(MapLandmark * map_landmark)
     // Add frame to the problem if its not added yet
     if (map_poses_.find(frame_id) == map_poses_.end())
     {
-      std::cout<<"Cartographer: [Ceres GlobalBA] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
+      if (verbose_level>1)
+        std::cout<<"Cartographer: [Global][BA - Ceres] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
       return false;
     }
 
@@ -671,7 +702,8 @@ bool VSSLAM_BA_Ceres::addLandmarkToGlobalSysyem(MapLandmark * map_landmark)
     }
     else
     {
-      std::cout<<"Cartographer: [Ceres GlobalBA] Adding landmark: "<<map_landmark->id_<<" cost function error!! Skipping landmark!";
+      if (verbose_level>1)
+        std::cout<<"Cartographer: [Global][BA - Ceres] Adding landmark: "<<map_landmark->id_<<" cost function error!! Skipping landmark!";
     }
 
   }
@@ -692,7 +724,8 @@ bool VSSLAM_BA_Ceres::addObservationToGlobalSystem(MapLandmark * map_landmark, M
   // Add frame to the problem if its not added yet
   if (map_poses_.find(frame_id) == map_poses_.end())
   {
-    std::cout<<"Cartographer: [Ceres GlobalBA] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Ceres] Adding landmark: Frame "<<frame_id<<" is not yet in the system!! Skipping landmark!";
     return false;
   }
 
@@ -727,13 +760,13 @@ bool VSSLAM_BA_Ceres::addObservationToGlobalSystem(MapLandmark * map_landmark, M
   }
   else
   {
-    std::cout<<"Cartographer: [Ceres GlobalBA] Adding landmark: "<<map_landmark->id_<<" cost function error!! Skipping landmark!";
-
+    if (verbose_level>1)
+      std::cout<<"Cartographer: [Global][BA - Ceres] Adding landmark: "<<map_landmark->id_<<" cost function error!! Skipping landmark!";
   }
   return true;
 }
 
-bool VSSLAM_BA_Ceres::optimizeGlobal(VSSLAM_Map & map_global)
+bool VSSLAM_BA_Ceres::optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats * stats)
 {
   // Export consistency marker
   if (options_.b_export_graph_file)
@@ -757,36 +790,56 @@ bool VSSLAM_BA_Ceres::optimizeGlobal(VSSLAM_Map & map_global)
   ceres_config_options.parameter_tolerance = options_.parameter_tolerance_;
 
 
+  if (stats)
+  {
+    stats->startTimer(stats->d_feat_mapping_global_step_BA);
+  }
   // Solve BA
   ceres::Solver::Summary summary;
   ceres::Solve(ceres_config_options, &problem_, &summary);
+
+  if (stats)
+  {
+    stats->stopTimer(stats->d_feat_mapping_global_step_BA);
+  }
+
   if (options_.b_ceres_summary_)
     std::cout << summary.FullReport() << std::endl;
 
   // If no error, get back refined parameters
   if (!summary.IsSolutionUsable())
   {
-    if (options_.b_verbose_)
-      std::cout << "Bundle Adjustment failed." << std::endl;
+    if (verbose_level>1)
+    {
+      if (options_.b_verbose_)
+        std::cout << "Bundle Adjustment failed." << std::endl;
+    }
     return false;
   }
   else // Solution is usable
   {
-    if (options_.b_verbose_)
+    if (verbose_level>1)
     {
-      // Display statistics about the minimization
-      std::cout << std::endl
-        << "Bundle Adjustment statistics (approximated RMSE):\n"
-        << " #keyframes: " << map_poses_.size() << "\n"
-        << " #intrinsics: " << map_intrinsics_.size() << "\n"
-        //<< " #points: " << slam_data.structure.size() << "\n"
-        << " #residuals: " << summary.num_residuals << "\n"
-        << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
-        << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
-        << " Time (s): " << summary.total_time_in_seconds << "\n"
-        << std::endl;
+      if (options_.b_verbose_)
+      {
+        // Display statistics about the minimization
+        std::cout << std::endl
+          << "Bundle Adjustment statistics (approximated RMSE):\n"
+          << " #keyframes: " << map_poses_.size() << "\n"
+          << " #intrinsics: " << map_intrinsics_.size() << "\n"
+          //<< " #points: " << slam_data.structure.size() << "\n"
+          << " #residuals: " << summary.num_residuals << "\n"
+          << " Initial RMSE: " << std::sqrt( summary.initial_cost / summary.num_residuals) << "\n"
+          << " Final RMSE: " << std::sqrt( summary.final_cost / summary.num_residuals) << "\n"
+          << " Time (s): " << summary.total_time_in_seconds << "\n"
+          << std::endl;
+      }
     }
 
+    if (stats)
+    {
+      stats->startTimer(stats->d_feat_mapping_global_step_update);
+    }
     // Recover camera data
 
     // Update camera poses with refined data
@@ -806,12 +859,30 @@ bool VSSLAM_BA_Ceres::optimizeGlobal(VSSLAM_Map & map_global)
       // Update the pose
       frame->setPose_sRt_Inverse(R_refined,t_refined,s_refined, nullptr);
 
-      std::cout<<"Frame: "<<frame->getFrameId()<<" updated!\n";
+      if (verbose_level>1)
+        std::cout<<"Cartographer: [BA - Ceres][Global] Frame: "<<frame->getFrameId()<<" updated!\n";
+
+    }
+
+    if (stats)
+    {
+      stats->stopTimer(stats->d_feat_mapping_global_step_update);
     }
 
     return true;
   }
+}
 
+bool VSSLAM_BA_Ceres::exportStateSE3(std::string p_s_filename)
+{
+  std::cout << "Export State SE3 with Ceres NOT IMPLEMENTED\n";
+  return true;
+}
+
+bool VSSLAM_BA_Ceres::exportDiagonalMarginals(std::string p_s_filename)
+{
+  std::cout << "Export State SE3 with Ceres NOT IMPLEMENTED\n";
+  return true;
 }
 
 }
