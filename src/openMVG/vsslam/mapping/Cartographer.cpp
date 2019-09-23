@@ -921,6 +921,7 @@ namespace vsslam {
       << '\n' << "property uchar green"
       << '\n' << "property uchar blue"
       << '\n' << "property double uncertainty"
+      << '\n' << "property int observations"
       << '\n' << "end_header" << std::endl;
 
     for (auto & frame_it : map_global_.map_frame_)
