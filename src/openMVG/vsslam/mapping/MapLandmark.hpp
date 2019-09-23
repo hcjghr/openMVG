@@ -41,7 +41,7 @@ public:
   IndexT id_;
   Vec3 X_;
   Eigen::Matrix3d cov_X_;
-  
+
   // 1 - initialization point; 2- motion model/reference kf; 3-map tracking point; 4- new triangulated point
   size_t association_type_ = 0; // Through which tye of association the point was added
   IndexT last_local_map_frame_id_ = UndefinedIndexT;  // Id of frame for which the point was last added to local map
@@ -146,6 +146,11 @@ public:
 
   void updateData();
 
+  float computeVolumeOfUncertainty(float chi_2)
+  {
+    //return (2.0 * pow(M_PI, 1.5)) / (3*(std::sqrt(M_PI)/pow(2.0,1.5)));
+    return ((2.0 * pow(M_PI, 1.5)) / (3*(std::sqrt(M_PI)/pow(2.0,1.5)))) * (pow(chi_2, 1.5) * pow(cov_X_.determinant(), 0.5));
+  }
 
 };
 

@@ -917,10 +917,10 @@ namespace vsslam {
       << '\n' << "property double x"
       << '\n' << "property double y"
       << '\n' << "property double z"
+      << '\n' << "property uchar red"
+      << '\n' << "property uchar green"
+      << '\n' << "property uchar blue"
       << '\n' << "property double uncertainty"
-      //<< '\n' << "property uchar red"
-      //<< '\n' << "property uchar green"
-      //<< '\n' << "property uchar blue"
       << '\n' << "end_header" << std::endl;
 
     for (auto & frame_it : map_global_.map_frame_)
@@ -931,8 +931,9 @@ namespace vsslam {
           << center(0) << ' '
           << center(1) << ' '
           << center(2) << ' '
-          << "0.0"
-          //<< "0 255 0"
+          << "0 255 0" << ' '
+          << "0.0" << ' '
+          << "0"
           << "\n";
     }
 
@@ -946,13 +947,15 @@ namespace vsslam {
             << center(0) << ' '
             << center(1) << ' '
             << center(2) << ' '
-            << "0.0"
-            //<< "255 255 0";
+            << "255 255 0" << ' '
+            << "0.0" << ' '
+            << "0"
             << "\n";
       }
     }
 
     // Export structure points as White points
+    float chi_2 = 7.81; //p = 3 alpha = 5%
     for ( auto & map_landmark_it : map_global_.map_landmarks_ )
     {
       MapLandmark * map_landmark = map_landmark_it.second.get();
@@ -962,8 +965,9 @@ namespace vsslam {
         << pt_3D_w(0) << ' '
         << pt_3D_w(1) << ' '
         << pt_3D_w(2) << ' '
-        << map_landmark->cov_X_.trace()
-        //<< "255 255 255"
+        << "255 255 255" << ' '
+        << map_landmark->computeVolumeOfUncertainty(chi_2) << ' '
+        << map_landmark->getNumberOfObservations()
         << "\n";
     }
 
@@ -979,8 +983,9 @@ namespace vsslam {
           << pt_3D_w(0) << ' '
           << pt_3D_w(1) << ' '
           << pt_3D_w(2) << ' '
-          << "0.0"
-          //<< "255 0 0"
+          << "255 0 0" << ' '
+          << "0.0" << ' '
+          << map_landmark->getNumberOfObservations()
           << "\n";
       }
     }
@@ -991,6 +996,7 @@ namespace vsslam {
 
     return bOk;
   }
+
 
   bool Cartographer::exportStateSE3(std::string filename)
   {
