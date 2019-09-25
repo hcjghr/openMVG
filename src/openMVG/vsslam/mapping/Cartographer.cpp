@@ -831,6 +831,8 @@ namespace vsslam {
       options.b_export_graph_file = params_->b_export_graph_file;
       options.s_graph_file = stlplus::create_filespec(params_->s_output_folder, params_->s_graph_file_path);
 
+      options.n_max_inc_iters = params_->slampp_n_max_inc_iters;
+
       BA_obj_ = std::unique_ptr<VSSLAM_BA>(new VSSLAM_BA_SlamPP(options));
       BA_obj_->setVerboseLevel(verbose_level);
       break;

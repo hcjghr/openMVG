@@ -107,7 +107,7 @@ struct VSSLAM_Parameters : public std::enable_shared_from_this<VSSLAM_Parameters
   size_t map_min_init_pts = 30;
   size_t map_min_obs_per_frame = 10;
 
-// ---------------
+  // ---------------
   // New Keyframe
   // ---------------
   size_t n_max_frames_not_tracked = 100;  // Max number of frames between two tracked frames
@@ -116,6 +116,11 @@ struct VSSLAM_Parameters : public std::enable_shared_from_this<VSSLAM_Parameters
 
   float f_min_ratio_of_landmarks_tracked_reference_frame = 0.4; // Min number of landmark tracked compared to prev frame (otherwise new frame)
   float f_max_ratio_of_landmarks_tracked_prev_frame = 1.4;//1.4;  // If more than ratio of landmarks tracked add frame
+
+  // ---------------
+  // SlamPP Settings
+  // ---------------
+  size_t slampp_n_max_inc_iters = 2;
 
   // ---------------
   // Output parameters
@@ -345,6 +350,11 @@ struct VSSLAM_Parameters : public std::enable_shared_from_this<VSSLAM_Parameters
         else if (name== "f_max_ratio_of_landmarks_tracked_prev_frame")
         {
           f_max_ratio_of_landmarks_tracked_prev_frame = std::stof(value);
+          
+        }
+        else if (name== "slampp_n_max_inc_iters")
+        {
+          slampp_n_max_inc_iters = std::stoi(value);
           
         }
         else if (name== "s_graph_file_path")
