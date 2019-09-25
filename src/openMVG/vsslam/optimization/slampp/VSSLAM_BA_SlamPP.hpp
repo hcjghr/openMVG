@@ -52,7 +52,7 @@ public:
     double f_relin_thresh = 0.0;
     double f_trust_radius = 0.2;  // trust-radius
     bool b_trust_radius_persistent = false;
-    int n_max_inc_iters = 1;  //max-nonlinear-solve-iters
+    int n_max_inc_iters = 5;  //max-nonlinear-solve-iters
 
     int n_max_final_iters = 5;  //max-final-nonlinear-solve-iters
     double f_inc_nlsolve_thresh = .005; //nonlinear-solve-error-thresh

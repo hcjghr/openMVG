@@ -182,7 +182,6 @@ public:
     openMVG::matching::L2<RegionT::DescriptorT::bin_type> metric;
     RegionT::DescriptorT::bin_type * d_A = static_cast<RegionT::DescriptorT::bin_type *>(desc_A);
     RegionT::DescriptorT::bin_type * d_B = static_cast<RegionT::DescriptorT::bin_type *>(desc_B);
-    std::cout<<"Mteric: "<<metric(d_A, d_B, RegionT::DescriptorT::static_size)<<"\n";
     return metric(d_A, d_B, RegionT::DescriptorT::static_size);
   }
 

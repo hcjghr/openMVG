@@ -40,6 +40,24 @@ public:
     //  new features::SIFT_Anatomy_Image_describer(features::SIFT_Anatomy_Image_describer::Params()));
     image_describer->Set_configuration_preset(preset);
   }
+  
+  Feat_Extractor_SIFT
+  (
+    std::shared_ptr<VSSLAM_Parameters> & params,
+    float thresh
+  )
+  : Abstract_Feature_Extractor(params)
+  {
+    // Set feature dependent thresholds
+    f_max_desc_dist_high_ = 100;
+    f_max_desc_dist_low_ = 150;
+
+    auto sift_params = features::SIFT_Image_describer::Params();
+    sift_params._peak_threshold = thresh;
+    // Initialize detector/descriptor
+    image_describer.reset(new features::SIFT_Image_describer
+      (sift_params, false));
+  }
 
   size_t getDescriptorLength() const override
   {

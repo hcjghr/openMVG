@@ -34,12 +34,16 @@ protected:
   std::shared_ptr<VSSLAM_Parameters> params_;
   /// Tracking status
   TRACKING_STATUS tracking_status_ = TRACKING_STATUS::NOT_INIT;
+  IndexT frame_last_relocalization_id = UndefinedIndexT;
+  IndexT frame_last_ok_frame_id = UndefinedIndexT;
+
+
   MotionModel motion_model_;
   // Tracking frames
   std::shared_ptr<Frame> frame_track_prev;
   std::shared_ptr<Frame> frame_track_current;
   std::shared_ptr<Frame> frame_track_last_reference;
-  IndexT frame_last_relocalization_id = UndefinedIndexT;
+  
 
 
   // Initialization obj
@@ -53,6 +57,8 @@ public:
   virtual bool isReady() = 0;
 
   virtual void printKeyFrameReason( size_t & keyframe_reason)=0;
+
+  virtual void reset()=0;
   
   void setVerboseLevel(int level)
   {
@@ -97,6 +103,20 @@ public:
       std::cout<<"IDLE\n";
       break;
     }
+  }
+
+  TRACKING_STATUS getTrackingStatus()
+  {
+    return tracking_status_;
+  }
+
+  IndexT getLastGoodFrameID()
+  {
+    return frame_last_ok_frame_id;
+  }
+  void setLastGoodFrameID(IndexT frame_id)
+  {
+    frame_last_ok_frame_id = frame_id;
   }
 };
 

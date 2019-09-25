@@ -38,6 +38,18 @@ namespace vsslam {
 
   }
 
+  void Cartographer::reset()
+  {
+    std::cout << "Cartographer: Reset system" << std::endl;
+
+    b_global_map_intialized_ = false;
+    map_global_.clear();
+    map_local_.clear();
+
+    // global optimization object
+    initGlobalOptimization();
+  }
+
   // -------------------
   // -- Initialization
   // -------------------

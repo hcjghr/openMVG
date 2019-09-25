@@ -31,11 +31,30 @@ public:
     // Set feature dependent thresholds
     f_max_desc_dist_high_ = 100;
     f_max_desc_dist_low_ = 150;
-
+    
     // Initialize detector/descriptor
     image_describer.reset(new features::AKAZE_Image_describer
       (features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MSURF), false));
     image_describer->Set_configuration_preset(preset);
+  }
+
+  Feat_Extractor_AKAZE_MSURF
+  (
+    std::shared_ptr<VSSLAM_Parameters> & params,
+    float thesh
+  )
+  : Abstract_Feature_Extractor(params)
+  {
+    // Set feature dependent thresholds
+    f_max_desc_dist_high_ = 100;
+    f_max_desc_dist_low_ = 150;
+
+    auto params_akaze = features::AKAZE::Params();
+    params_akaze.fThreshold = features::AKAZE::Params().fThreshold * thesh;
+
+    // Initialize detector/descriptor
+    image_describer.reset(new features::AKAZE_Image_describer
+      (features::AKAZE_Image_describer::Params(params_akaze, features::AKAZE_MSURF), false));
   }
 
   size_t getDescriptorLength() const override
@@ -109,7 +128,6 @@ public:
     openMVG::matching::L2<RegionT::DescriptorT::bin_type> metric;
     RegionT::DescriptorT::bin_type * d_A = static_cast<RegionT::DescriptorT::bin_type *>(desc_A);
     RegionT::DescriptorT::bin_type * d_B = static_cast<RegionT::DescriptorT::bin_type *>(desc_B);
-    std::cout<<"Mteric: "<<metric(d_A, d_B, RegionT::DescriptorT::static_size)<<"\n";
     return metric(d_A, d_B, RegionT::DescriptorT::static_size);
   }
 

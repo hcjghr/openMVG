@@ -240,13 +240,15 @@ namespace vsslam {
   )
   {
     if (verbose_level > 0)
-      std::cout<<"VSSLAM [System] Frame: "<<id_frame<<" Camera ID: "<< id_cam<<" at time: "<<time_frame<<"\n";
-
-    if (time_data.b_enable_time_stats || time_data.b_enable_features_stats)
     {
+      std::cout<<"VSSLAM [System] Frame: "<<id_frame<<" Camera ID: "<< id_cam<<" at time: "<<time_frame<< std::endl;
+    }
+
+    //if (time_data.b_enable_time_stats || time_data.b_enable_features_stats)
+    //{
       time_data.restartData();
       time_data.frame_id = id_frame;
-    }
+    //}
 
     // Create frame
     Camera * ptr_cam = map_cameras_[id_cam].get();
@@ -261,8 +263,27 @@ namespace vsslam {
     // Time statistics
     time_data.stopTimer(time_data.d_track_track);
 
+
+    if (tracker_->getTrackingStatus() == TRACKING_STATUS::LOST)
+    {
+      if ((frame_current_->getFrameId()-params_->max_lost_frames_before_reinit) > tracker_->getLastGoodFrameID())
+      {
+        std::cout << "VSSLAM [System] Reset system" << std::endl;
+        // Reset complete system
+        tracker_->reset();
+        cartographer_->reset();
+
+      }
+    }
+    else if(tracker_->getTrackingStatus() == TRACKING_STATUS::OK)
+    {
+      tracker_->setLastGoodFrameID(frame_current_->getFrameId());
+    }
+
     // Update cartographer stats
     cartographer_->setMapStats(time_data);
+
+
 
     // Show tracking status
     if (verbose_level > 0)
@@ -287,6 +308,20 @@ namespace vsslam {
       std::cout << "VSSLAM: [System] Camera " << cam_id << " parameters:\n";
       map_cameras_[cam_id]->printParameters();
     }
+  }
+
+  Camera* SLAM_System::getCameraPtr(IndexT & cam_id)
+  {
+    if (map_cameras_.find(cam_id) == map_cameras_.end())
+    {
+      std::cout << "VSSLAM [System] Camera with ID: " << cam_id << " NOT FOUND\n";
+      return nullptr;
+    }
+    else
+    {
+      return map_cameras_[cam_id].get();
+    }
+
   }
 
   void SLAM_System::disableOutput()

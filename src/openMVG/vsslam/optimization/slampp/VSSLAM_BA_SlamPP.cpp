@@ -354,10 +354,6 @@ bool VSSLAM_BA_SlamPP::optimizeGlobal(VSSLAM_Map & map_global, VSSLAM_Time_Stats
 
     // Recover covariance
     landmark->cov_X_ = problem_->Get_CovarianceBlock(landmark_slampp_id,landmark_slampp_id);
-
-    std::cout << "Landmark: " << landmark_slampp_id << "\n";
-    std::cout << landmark->cov_X_ << "\n";
-
   }
 
   if (stats)

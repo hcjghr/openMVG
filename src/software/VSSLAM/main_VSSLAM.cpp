@@ -56,8 +56,11 @@ int main(int argc, char **argv)
   std::string sImaMask = "";
   unsigned int uTracker = 0;
 
+  std::string config_file_path="";
+
   int verbose_level = 0;  // 0 - none; 1 - stats; 2 - all
   bool b_prompt_wait = false;
+  bool b_ceres_global_BA = false;
 
   // Camera data
   std::string sKmatrix;
@@ -66,11 +69,13 @@ int main(int argc, char **argv)
   cmd.add( make_option('i', sImaDirectory, "imadir") );
   cmd.add( make_option('o', sOutDir, "out_dir") );
   cmd.add( make_option('m', sImaMask, "imamask") );
+  cmd.add( make_option('s', config_file_path, "config_file_path") );
   cmd.add( make_option('t', uTracker, "tracker") );
   cmd.add( make_option('k', sKmatrix, "intrinsics") );
   cmd.add( make_option('c', i_User_camera_model, "camera_model") );
   cmd.add( make_option('v', verbose_level, "verbose_level") );
   cmd.add( make_switch('w', "prompt_wait") );
+  cmd.add( make_switch('C', "ceres_global_BA") );
 
   try {
     if (argc == 1) throw std::string("Invalid command line parameter.");
@@ -80,6 +85,7 @@ int main(int argc, char **argv)
     << "[-i|--imadir image path] \n"
     << "[-o|--out_dir output path] \n"
     << "[-m|--mask image] \n"
+    << "[-s|--config_file_path config file] \n"
     << "[-t|--tracker Used tracking interface] \n"
     << "\t 0 (default) description based Tracking -> Fast detector + Dipole descriptor\n"
 #if defined HAVE_OPENCV
@@ -97,6 +103,7 @@ int main(int argc, char **argv)
     << "\t 4: Pinhole brown 2\n"
     << "\t 5: Pinhole with a simple Fish-eye distortion\n"
     << "[-w|--prompt_wait] wait for key after frame\n"
+    << "[-C|--ceres_global_BA] Use Ceres as global BA\n"
     << std::endl;
 
     std::cerr << s << std::endl;
@@ -107,6 +114,7 @@ int main(int argc, char **argv)
             << argv[0] << std::endl
             << "--imageDirectory " << sImaDirectory << std::endl
             << "--imageMask " << sImaMask << std::endl
+            << "--config_file_path " << config_file_path << std::endl
             << "--intrinsics " << sKmatrix << std::endl
             << "--camera_model " << i_User_camera_model << std::endl;
 
@@ -117,6 +125,7 @@ int main(int argc, char **argv)
   }
 
   b_prompt_wait = (cmd.used('w')?true:false);
+  b_ceres_global_BA = (cmd.used('C')?true:false);
 
   // ----------------------------------
   // Image management
@@ -151,6 +160,11 @@ int main(int argc, char **argv)
 
   // initialize params
   std::shared_ptr<VSSLAM_Parameters> params_system = std::make_shared<VSSLAM_Parameters>();
+  if(!config_file_path.empty())
+  {
+    std::cout<<"\nVSSLAM: [Main] Load config file\n";
+    params_system->LoadConfigFile(config_file_path);
+  }
   SLAM_System slam_system(params_system);
 
   // Output settings
@@ -172,7 +186,13 @@ int main(int argc, char **argv)
   MAP_FRAME_TYPE map_frame_type = MAP_FRAME_TYPE::GLOBAL;
   MAP_LANDMARK_TYPE map_landmark_type = MAP_LANDMARK_TYPE::GLOBAL_EUCLIDEAN;
 
-  MAP_OPTIMIZATION_TYPE global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
+  MAP_OPTIMIZATION_TYPE global_BA_type;
+
+  if (b_ceres_global_BA)
+    global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
+  else
+    global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
+
   MAP_OPTIMIZATION_TYPE local_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
 
   {
@@ -183,21 +203,28 @@ int main(int argc, char **argv)
     switch (uTracker)
     {
       case 0:
-        ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, features::HIGH_PRESET));
+        ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, features::NORMAL_PRESET));
         ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
-        //global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
-        global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
         display_data.b_enable_display = 0;
 
         break;
       case 1:
-        ptr_feat_extractor.reset(new Feat_Extractor_AKAZE_MSURF(params_system, features::NORMAL_PRESET));
         //ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, features::HIGH_PRESET));
+        ptr_feat_extractor.reset(new Feat_Extractor_SIFT(params_system, params_system->feat_extract_sift_thresh));
         ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
-        //global_BA_type = MAP_OPTIMIZATION_TYPE::CERES;
-        global_BA_type = MAP_OPTIMIZATION_TYPE::SLAMPP;
         display_data.b_enable_display = 0;
-        //ptr_feat_matcher.reset(new Feat_Matcher_Regions(params_system, ptr_feat_extractor.get()));
+
+        break;
+      case 2:
+        ptr_feat_extractor.reset(new Feat_Extractor_AKAZE_MSURF(params_system, features::NORMAL_PRESET));
+        ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
+        display_data.b_enable_display = 0;
+        break;
+      case 3:
+        //ptr_feat_extractor.reset(new Feat_Extractor_AKAZE_MSURF(params_system, features::HIGH_PRESET));
+        ptr_feat_extractor.reset(new Feat_Extractor_AKAZE_MSURF(params_system, params_system->feat_extract_akaze_thresh));
+        ptr_feat_matcher.reset(new Feat_Matcher_CascadeHashing(params_system, ptr_feat_extractor.get()));
+        display_data.b_enable_display = 0;
         break;
       default:
         std::cerr << "VSSLAM: [Main] Unknow tracking method" << std::endl;
@@ -269,8 +296,17 @@ int main(int argc, char **argv)
       return EXIT_FAILURE;
     }
 
+
+    // Update thresholds with camera size
+    Camera * cam_0 = slam_system.getCameraPtr(id_cam_0);
+    params_system->updateThresholdsWithImageSize(cam_0->getImageWidth(), cam_0->getImageHeight());
+
     
   }
+
+std::cout << params_system->init_track_min_cos_parallax_pt << "\n";
+  
+
   // ----------------------------------
   // Load mask images
   // ----------------------------------
@@ -330,13 +366,16 @@ int main(int argc, char **argv)
   for (std::vector<std::string>::const_iterator iterFile = vec_image.begin();
       iterFile != vec_image.end(); ++iterFile, ++id_frame, ++timestamp_frame)
   {
+std::cout << "NEXT FRAME" << std::endl;
     const std::string sImageFilename = stlplus::create_filespec( sImaDirectory, *iterFile );
     if (openMVG::image::ReadImage( sImageFilename.c_str(), &currentImage))
     {
       slam_system.nextFrame(currentImage, id_frame, id_cam,timestamp_frame);
 
      
+        std::cout << "Display 00" << std::endl;
 #ifndef SWINE_NOGL
+        std::cout << "Display 0" << std::endl;
       if (window._height < 0)
       {
         // no window created yet, initialize it with the first frame
@@ -361,22 +400,30 @@ int main(int argc, char **argv)
       }
       else
       {
+        std::cout << "Display 1" << std::endl;
         // Set title
         std::stringstream ss;
-        ss << "Frame: " << " " << slam_system.getCurrentFramePtr()->getFrameId();
+        ss << "Frame: " << " " << slam_system.getCurrentFramePtr()->getFrameId() << " # global frames/landmarks: " << time_data.global_frames << "/" << time_data.global_landmarks;
         window.setTitle(ss.str());
 
+        std::cout << "Display 2" << std::endl;
         display_data.displayImage(window,text2D, currentImage);
+        std::cout << "Display 3" << std::endl;
         // Detected features yellow
         display_data.displayDetectedFeatures(slam_system.getCurrentFramePtr());
 
+        std::cout << "Display 4" << std::endl;
         display_data.displayLocalMap(slam_system.getCurrentFramePtr());
 
+        std::cout << "Display 5" << std::endl;
         if (slam_system.isMapInitialized())    
           display_data.displayHistoryTracks(slam_system.getCurrentFramePtr());
 
+        std::cout << "Display 6" << std::endl;
         display_data.displayFeaturesByAssociation(slam_system.getCurrentFramePtr());
+        std::cout << "Display 7" << std::endl;
         display_data.displayFrameActivityIndicator(window,slam_system.getCurrentFramePtr());
+        std::cout << "Display 8" << std::endl;
 
       }
 

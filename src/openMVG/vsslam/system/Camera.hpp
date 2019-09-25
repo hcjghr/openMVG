@@ -135,6 +135,20 @@ public:
     }
     return true;
   }
+
+  int getImageWidth()
+  {
+    if (ptr_intrinsic_valid_)
+      return ptr_intrinsic_valid_->w();
+    return 0;
+  }
+  int getImageHeight()
+  {
+    if (ptr_intrinsic_valid_)
+      return ptr_intrinsic_valid_->h();
+    return 0;
+  }
+
   void computeImageBorders()
   {
     if (b_calibrated_ && ptr_intrinsic_->have_disto())

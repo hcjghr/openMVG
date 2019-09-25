@@ -63,6 +63,7 @@ public:
     const MAP_OPTIMIZATION_TYPE & local_BA_type
   );
 
+  void reset();
 
   void setVerboseLevel(int level)
   {

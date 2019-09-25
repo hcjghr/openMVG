@@ -87,6 +87,8 @@ public:
 
   void printCameraParameters(IndexT & cam_id);
 
+  Camera* getCameraPtr(IndexT & cam_id);
+
   void printStatistics(VSSLAM_Time_Stats & stats);
 
 

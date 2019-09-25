@@ -399,13 +399,22 @@ struct VSSLAM_Display
   {
     glPointSize(3.0f);
     glBegin(GL_POINTS);
-    glColor3f(0.f, 0.f, 1.f);
     for (IndexT feat_i = 0; feat_i<display_local_map.size(); ++feat_i)
     {
       // Get Landmark data
       MapLandmark * map_landmark = display_local_map[feat_i];
       if (!map_landmark)
         continue;
+
+      // Blue if its local frame
+      if (map_landmark->isActive())
+      {
+        glColor3f(1.f, 0.65f, 0.f);
+      }
+      else
+      {
+        glColor3f(0.f, 0.f, 1.f);
+      }
 
       // Project point to frame coordinate system
       Vec2 pt_2D_frame;
